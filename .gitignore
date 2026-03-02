@@ -1,0 +1,14 @@
+# CMake build directory
+build/
+
+# Compiled output
+*.exe
+*.o
+*.obj
+*.d
+
+# VS Code local settings (keep tasks.json and c_cpp_properties.json if you want)
+.vscode/
+
+# Windows
+Thumbs.db
