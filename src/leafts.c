@@ -21,10 +21,11 @@ static uint16_t crc16(const uint8_t *data, size_t len)
 int leafts_init(leafts_db_t *db, hal_flash_t *hal, uint32_t base_address, uint32_t size)
 {
     if (db == NULL || hal == NULL) return LEAFTS_ERR_NULL; // NULL pointer error
-    db->flash = hal; // Set flash HAL pointer
-    db->base_address = base_address; // Set base address for LeafTS data in flash
-    db->capacity = size / sizeof(leafts_record_t); // Calculate capacity based on flash size and record size
-    db->record_count = 0; // Initialize record count to 0 (could also scan flash to count existing records if needed)
+    db->flash        = hal;           // Set flash HAL pointer
+    db->base_address  = base_address; // Set base address for LeafTS data in flash
+    db->region_size   = size;         // Store total size of reserved flash region
+    db->capacity      = size / sizeof(leafts_record_t); // Calculate capacity based on flash size and record size
+    db->record_count  = 0;            // Initialize record count to 0
 
     leafts_record_t record;
     for(uint32_t record_index = 0; record_index < db->capacity; record_index++){
@@ -86,5 +87,46 @@ int leafts_get_latest(leafts_db_t *db, leafts_record_t *out)
     if (out->crc != crc16((const uint8_t *)out, sizeof(leafts_record_t) - sizeof(uint16_t)))
         return LEAFTS_ERR_CRC; // CRC check failed error
 
-    return LEAFTS_OK;
+    return LEAFTS_OK; // Success
+}
+
+// GET RECORD BY INDEX FUNCTION
+int leafts_get_by_index(leafts_db_t *db, uint32_t index, leafts_record_t *out)
+{
+    if (db == NULL || out == NULL) return LEAFTS_ERR_NULL;   // NULL pointer error
+    if (index >= db->record_count) return LEAFTS_ERR_BOUNDS; // Index out of bounds error
+
+    // Calculate flash address of the record at the given index
+    uint32_t flash_address = db->base_address + index * sizeof(leafts_record_t);
+
+    // Read the record from flash using the HAL read function
+    if (db->flash->read(flash_address, (uint8_t *)out, sizeof(leafts_record_t)) != 0)
+        return LEAFTS_ERR_HAL; // HAL read error
+
+    // Verify magic number and CRC checksum for integrity
+    if (out->magic != LEAFTS_MAGIC)
+        return LEAFTS_ERR_CRC; // Magic number check failed error
+    if (out->crc != crc16((const uint8_t *)out, sizeof(leafts_record_t) - sizeof(uint16_t)))
+        return LEAFTS_ERR_CRC; // CRC check failed error
+
+    return LEAFTS_OK; // Success
+}
+
+// ERASE DATABASE FUNCTION
+int leafts_erase(leafts_db_t *db)
+{
+    if (db == NULL) return LEAFTS_ERR_NULL; // NULL pointer error
+
+    // Calculate number of sectors to erase based on reserved region size
+    uint32_t sector_count = db->region_size / db->flash->sector_size;
+
+    // Erase each sector in the reserved region
+    for (uint32_t sector_index = 0; sector_index < sector_count; sector_index++) {
+        uint32_t sector_address = db->base_address + sector_index * db->flash->sector_size;
+        if (db->flash->erase(sector_address) != 0)
+            return LEAFTS_ERR_HAL; // HAL erase error
+    }
+
+    db->record_count = 0; // Reset record count after erase
+    return LEAFTS_OK; // Success
 }

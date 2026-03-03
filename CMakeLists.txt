@@ -30,3 +30,20 @@ target_include_directories(leafts PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/hal
     ${CMAKE_CURRENT_SOURCE_DIR}/include
 )
+
+# Test executable - Unity framework + CTest
+enable_testing()
+
+add_executable(leafts_test
+    test/test.c
+    src/hal_vflash.c
+    src/leafts.c
+    unity/unity.c
+)
+target_include_directories(leafts_test PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_CURRENT_SOURCE_DIR}/hal
+    ${CMAKE_CURRENT_SOURCE_DIR}/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/unity
+)
+add_test(NAME LeafTS_Tests COMMAND leafts_test)
