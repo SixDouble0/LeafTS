@@ -21,6 +21,7 @@ set(CMAKE_C_EXTENSIONS OFF)
 add_executable(leafts
     main.c
     src/hal_vflash.c
+    src/leafts.c
 )
 
 # Ścieżki do plików nagłówkowych (.h)
