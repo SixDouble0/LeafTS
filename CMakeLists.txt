@@ -47,3 +47,22 @@ target_include_directories(leafts_test PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/unity
 )
 add_test(NAME LeafTS_Tests COMMAND leafts_test)
+
+# UART SERVER TARGET - TCP SOCKET VIRTUAL UART + uart_handler
+# ON REAL MCU: REPLACE hal_vuart.c WITH hal_stm32_uart.c OR hal_esp32_uart.c
+add_executable(leafts_uart
+    main_uart.c
+    src/hal_vflash.c
+    src/hal_vuart.c
+    src/leafts.c
+    src/uart_handler.c
+)
+target_include_directories(leafts_uart PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_CURRENT_SOURCE_DIR}/hal
+    ${CMAKE_CURRENT_SOURCE_DIR}/include
+)
+# LINK WINSOCK2 ON WINDOWS - REQUIRED FOR TCP SOCKETS
+if(WIN32)
+    target_link_libraries(leafts_uart PRIVATE ws2_32)
+endif()
