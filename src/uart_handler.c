@@ -9,20 +9,24 @@ static void uart_send_str(hal_uart_t *uart, const char *str)
     uart->send((const uint8_t *)str, (uint32_t)strlen(str));
 }
 
-// ------------------------------------------------------------------ //
+
 
 // PROCESS ONE COMPLETE LINE - DISPATCH TO CORRECT leafts_* FUNCTION
 // PROTOCOL:
 //   append <timestamp> <value>  ->  "OK\n"  or  "ERR <code>\n"
 //   latest                      ->  "OK <timestamp> <value>\n"
 //   list                        ->  "OK <count>\n" + one line per record
+//   get_last <n>                ->  "OK <count>\n" + last N lines
+//   get_range <ts_from> <ts_to> ->  "OK <count>\n" + matching lines
+//   get_min                     ->  "OK <timestamp> <value>\n"
+//   get_max                     ->  "OK <timestamp> <value>\n"
 //   status                      ->  "OK count=N capacity=N\n"
 //   erase                       ->  "OK\n"
 int uart_handler_process(const char *line, leafts_db_t *db, hal_uart_t *uart)
 {
     char response[128];
 
-    // ---- APPEND ----
+    //  APPEND 
     if (strncmp(line, "append", 6) == 0)
     {
         uint32_t timestamp;
@@ -50,7 +54,7 @@ int uart_handler_process(const char *line, leafts_db_t *db, hal_uart_t *uart)
         return result;
     }
 
-    // ---- LATEST ----
+    //  LATEST 
     if (strncmp(line, "latest", 6) == 0)
     {
         leafts_record_t record;
@@ -71,7 +75,7 @@ int uart_handler_process(const char *line, leafts_db_t *db, hal_uart_t *uart)
         return result;
     }
 
-    // ---- LIST ----
+    //  LIST 
     if (strncmp(line, "list", 4) == 0)
     {
         // SEND COUNT FIRST SO CLIENT KNOWS HOW MANY LINES TO READ
@@ -93,7 +97,147 @@ int uart_handler_process(const char *line, leafts_db_t *db, hal_uart_t *uart)
         return LEAFTS_OK;
     }
 
-    // ---- STATUS ----
+    // ---- GET_LAST ----
+    if (strncmp(line, "get_last", 8) == 0)
+    {
+        uint32_t n;
+
+        // PARSE HOW MANY LAST RECORDS TO RETURN
+        if (sscanf(line, "get_last %lu", &n) != 1)
+        {
+            uart_send_str(uart, "ERR bad_args\n");
+            return LEAFTS_ERR_NULL;
+        }
+
+        // CLAMP N TO ACTUAL RECORD COUNT - CANT RETURN MORE THAN EXISTS
+        if (n > db->record_count) n = db->record_count;
+
+        // SEND COUNT FIRST SO CLIENT KNOWS HOW MANY LINES TO READ
+        snprintf(response, sizeof(response), "OK %lu\n", (unsigned long)n);
+        uart_send_str(uart, response);
+
+        // START FROM (record_count - n) - THE N-TH RECORD FROM THE END
+        uint32_t start_index = db->record_count - n;
+        for (uint32_t record_index = start_index; record_index < db->record_count; record_index++)
+        {
+            leafts_record_t record;
+            if (leafts_get_by_index(db, record_index, &record) == LEAFTS_OK)
+            {
+                snprintf(response, sizeof(response),
+                         "%lu %f\n", (unsigned long)record.timestamp, record.value);
+                uart_send_str(uart, response);
+            }
+        }
+
+        return LEAFTS_OK;
+    }
+
+    // ---- GET_RANGE ----
+    if (strncmp(line, "get_range", 9) == 0)
+    {
+        uint32_t ts_from;
+        uint32_t ts_to;
+
+        // PARSE TIMESTAMP RANGE FROM LINE
+        if (sscanf(line, "get_range %lu %lu", &ts_from, &ts_to) != 2)
+        {
+            uart_send_str(uart, "ERR bad_args\n");
+            return LEAFTS_ERR_NULL;
+        }
+
+        // FIRST PASS - COUNT HOW MANY RECORDS MATCH SO CLIENT KNOWS SIZE
+        uint32_t match_count = 0;
+        for (uint32_t record_index = 0; record_index < db->record_count; record_index++)
+        {
+            leafts_record_t record;
+            if (leafts_get_by_index(db, record_index, &record) == LEAFTS_OK)
+            {
+                if (record.timestamp >= ts_from && record.timestamp <= ts_to)
+                    match_count++;
+            }
+        }
+
+        // SEND COUNT FIRST
+        snprintf(response, sizeof(response), "OK %lu\n", (unsigned long)match_count);
+        uart_send_str(uart, response);
+
+        // SECOND PASS - SEND MATCHING RECORDS
+        for (uint32_t record_index = 0; record_index < db->record_count; record_index++)
+        {
+            leafts_record_t record;
+            if (leafts_get_by_index(db, record_index, &record) == LEAFTS_OK)
+            {
+                if (record.timestamp >= ts_from && record.timestamp <= ts_to)
+                {
+                    snprintf(response, sizeof(response),
+                             "%lu %f\n", (unsigned long)record.timestamp, record.value);
+                    uart_send_str(uart, response);
+                }
+            }
+        }
+
+        return LEAFTS_OK;
+    }
+
+    // ---- GET_MIN ----
+    if (strncmp(line, "get_min", 7) == 0)
+    {
+        if (db->record_count == 0)
+        {
+            uart_send_str(uart, "ERR empty\n");
+            return LEAFTS_ERR_EMPTY;
+        }
+
+        // SCAN ALL RECORDS AND TRACK THE ONE WITH THE LOWEST VALUE
+        leafts_record_t min_record;
+        leafts_get_by_index(db, 0, &min_record);
+
+        for (uint32_t record_index = 1; record_index < db->record_count; record_index++)
+        {
+            leafts_record_t record;
+            if (leafts_get_by_index(db, record_index, &record) == LEAFTS_OK)
+            {
+                if (record.value < min_record.value)
+                    min_record = record;
+            }
+        }
+
+        snprintf(response, sizeof(response),
+                 "OK %lu %f\n", (unsigned long)min_record.timestamp, min_record.value);
+        uart_send_str(uart, response);
+        return LEAFTS_OK;
+    }
+
+    // ---- GET_MAX ----
+    if (strncmp(line, "get_max", 7) == 0)
+    {
+        if (db->record_count == 0)
+        {
+            uart_send_str(uart, "ERR empty\n");
+            return LEAFTS_ERR_EMPTY;
+        }
+
+        // SCAN ALL RECORDS AND TRACK THE ONE WITH THE HIGHEST VALUE
+        leafts_record_t max_record;
+        leafts_get_by_index(db, 0, &max_record);
+
+        for (uint32_t record_index = 1; record_index < db->record_count; record_index++)
+        {
+            leafts_record_t record;
+            if (leafts_get_by_index(db, record_index, &record) == LEAFTS_OK)
+            {
+                if (record.value > max_record.value)
+                    max_record = record;
+            }
+        }
+
+        snprintf(response, sizeof(response),
+                 "OK %lu %f\n", (unsigned long)max_record.timestamp, max_record.value);
+        uart_send_str(uart, response);
+        return LEAFTS_OK;
+    }
+
+    //  STATUS 
     if (strncmp(line, "status", 6) == 0)
     {
         snprintf(response, sizeof(response),
@@ -104,7 +248,7 @@ int uart_handler_process(const char *line, leafts_db_t *db, hal_uart_t *uart)
         return LEAFTS_OK;
     }
 
-    // ---- ERASE ----
+    //  ERASE 
     if (strncmp(line, "erase", 5) == 0)
     {
         int result = leafts_erase(db);
@@ -122,7 +266,7 @@ int uart_handler_process(const char *line, leafts_db_t *db, hal_uart_t *uart)
         return result;
     }
 
-    // ---- UNKNOWN COMMAND ----
+    //  UNKNOWN COMMAND 
     uart_send_str(uart, "ERR unknown_cmd\n");
     return LEAFTS_ERR_NULL;
 }
