@@ -18,3 +18,12 @@ renode/out.txt
 
 # Windows
 Thumbs.db
+
+# PyInstaller build artifacts
+pyinstaller_build/
+dist/
+
+# PyInstaller build artifacts
+pyinstaller_build/
+dist/
+*.spec.bak

@@ -6,9 +6,9 @@
                 "${workspaceFolder}/**"
             ],
             "defines": [],
-            "compilerPath": "cl.exe",
+            "compilerPath": "C:/msys64/ucrt64/bin/gcc.exe",
             "cStandard": "c11",
-            "intelliSenseMode": "windows-msvc-x64"
+            "intelliSenseMode": "gcc-x64"
         },
         {
             "name": "ARM (Renode)",
