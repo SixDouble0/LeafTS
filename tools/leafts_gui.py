@@ -320,10 +320,13 @@ class SerialBackend(Backend):
         self._baud = baud
         self._ser: serial.Serial | None = None
         self._stop_ev = threading.Event()
+        import queue
+        self._tx_queue: queue.Queue[bytes] = queue.Queue()
 
     def run(self):
+        import queue
         try:
-            self._ser = serial.Serial(self._port, self._baud, timeout=0.1)
+            self._ser = serial.Serial(self._port, self._baud, timeout=0.05)
             time.sleep(0.1)
             self.connected.emit()
         except serial.SerialException as e:
@@ -333,6 +336,15 @@ class SerialBackend(Backend):
         buf = b""
         while not self._stop_ev.is_set():
             try:
+                # drain outgoing queue first (non-blocking)
+                while True:
+                    try:
+                        data = self._tx_queue.get_nowait()
+                        self._ser.write(data)
+                    except queue.Empty:
+                        break
+
+                # read incoming
                 chunk = self._ser.read(256)
                 if chunk:
                     buf += chunk
@@ -345,11 +357,8 @@ class SerialBackend(Backend):
                 return
 
     def send(self, cmd: str):
-        if self._ser and self._ser.is_open:
-            try:
-                self._ser.write((cmd.strip() + "\r\n").encode())
-            except serial.SerialException:
-                self.disconnected.emit("UART connection lost.")
+        # called from UI thread — just enqueue, run() does the actual write
+        self._tx_queue.put((cmd.strip() + "\r\n").encode())
 
     def stop(self):
         self._stop_ev.set()
