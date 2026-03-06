@@ -80,12 +80,17 @@ def tcp_to_serial(sock: socket.socket, ser: serial.Serial, stop: threading.Event
 
 
 def serial_to_tcp(ser: serial.Serial, sock: socket.socket, stop: threading.Event):
-    """Forward COM port → TCP."""
+    """Forward COM port → TCP, normalising \r\n → \n."""
+    buf = b""
     while not stop.is_set():
         try:
             data = ser.read(256)
             if data:
-                sock.sendall(data)
+                buf += data
+                # emit complete lines with \r stripped
+                while b"\n" in buf:
+                    line, buf = buf.split(b"\n", 1)
+                    sock.sendall(line.rstrip(b"\r") + b"\n")
         except serial.SerialException:
             break
         except OSError:
