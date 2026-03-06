@@ -1,0 +1,23 @@
+// Minimal STM32L476 platform - tylko tyle ile trzeba do uruchomienia testów Unity.
+// Brak kontrolera flash, UART itp. - testy używają hal_vflash (software), 
+// a wyjście idzie przez semihosting (nie przez UART).
+
+nvic: IRQControllers.NVIC @ sysbus 0xE000E000
+    priorityMask: 0xF0
+    systickFrequency: 80000000
+    IRQ -> cpu@0
+
+cpu: CPU.CortexM @ sysbus
+    cpuType: "cortex-m4f"
+    nvic: nvic
+
+flash: Memory.MappedMemory @ sysbus 0x08000000
+    size: 0x00100000
+
+sram: Memory.MappedMemory @ sysbus 0x20000000
+    size: 0x00018000
+
+// USART2 - Unity printf output goes here (showAnalyzer to see it)
+usart2: UART.STM32F7_USART @ sysbus 0x40004400
+    frequency: 80000000
+    IRQ -> nvic@38

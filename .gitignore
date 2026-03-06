@@ -6,9 +6,15 @@ build/
 *.o
 *.obj
 *.d
+*.elf
+*.map
 
-# VS Code local settings (keep tasks.json and c_cpp_properties.json if you want)
-.vscode/
+# VS Code - keep c_cpp_properties.json (ARM toolchain config) and tasks.json
+.vscode/settings.json
+.vscode/launch.json
+
+# Temp / debug
+renode/out.txt
 
 # Windows
 Thumbs.db

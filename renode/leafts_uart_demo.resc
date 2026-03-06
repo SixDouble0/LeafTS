@@ -1,0 +1,13 @@
+using sysbus
+
+mach create "LeafTS_UART"
+machine LoadPlatformDescription @C:/Projects/LeafTS/renode/stm32l476.repl
+
+# This opens the UART Analyzer window - type commands here
+showAnalyzer sysbus.usart2
+
+macro reset
+"""
+    sysbus LoadELF @C:/Projects/LeafTS/renode/leafts_uart_demo.elf
+"""
+runMacro $reset

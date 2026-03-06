@@ -48,6 +48,39 @@ target_include_directories(leafts_test PRIVATE
 )
 add_test(NAME LeafTS_Tests COMMAND leafts_test)
 
+# Universal HAL flash contract tests for STM32L4.
+# To add a new family: create test/setup_<family>.c (15 lines),
+# add a target below. The test logic in hal_flash_contract.c never changes.
+add_executable(leafts_test_hal_contract_stm32l4
+    test/hal_flash_contract.c
+    test/setup_stm32l4.c
+    src/hal_stm32l4_flash.c
+    unity/unity.c
+)
+target_include_directories(leafts_test_hal_contract_stm32l4 PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/hal
+    ${CMAKE_CURRENT_SOURCE_DIR}/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/unity
+    ${CMAKE_CURRENT_SOURCE_DIR}/test
+)
+add_test(NAME HAL_STM32L4_Contract_Tests COMMAND leafts_test_hal_contract_stm32l4)
+
+# STM32L4 Mock MMIO test - redirects registers + flash memory to RAM buffers.
+# Tests register-level logic (unlock sequence, CR bits, actual data write/read).
+# Runs on host (x86) without hardware or emulator.
+add_executable(leafts_test_hal_stm32l4_mock
+    test/test_hal_stm32l4_mock.c
+    src/hal_stm32l4_flash.c
+    unity/unity.c
+)
+target_include_directories(leafts_test_hal_stm32l4_mock PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/hal
+    ${CMAKE_CURRENT_SOURCE_DIR}/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/unity
+)
+target_compile_definitions(leafts_test_hal_stm32l4_mock PRIVATE LEAFTS_MOCK_FLASH)
+add_test(NAME HAL_STM32L4_Mock_Tests COMMAND leafts_test_hal_stm32l4_mock)
+
 # UART SERVER TARGET - TCP SOCKET VIRTUAL UART + uart_handler
 # ON REAL MCU: REPLACE hal_vuart.c WITH hal_stm32_uart.c OR hal_esp32_uart.c
 add_executable(leafts_uart
@@ -66,3 +99,17 @@ target_include_directories(leafts_uart PRIVATE
 if(WIN32)
     target_link_libraries(leafts_uart PRIVATE ws2_32)
 endif()
+
+# ---------------------------------------------------------------------------
+# HAL compile-check targets
+# Compiled as OBJECT libraries so we verify the source is syntactically correct
+# and matches the hal_flash_t interface - even without real hardware.
+# These are NOT linked into any executable; they exist only to catch API drift.
+# ---------------------------------------------------------------------------
+add_library(hal_stm32l4_obj OBJECT
+    src/hal_stm32l4_flash.c
+)
+target_include_directories(hal_stm32l4_obj PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/hal
+    ${CMAKE_CURRENT_SOURCE_DIR}/include
+)
