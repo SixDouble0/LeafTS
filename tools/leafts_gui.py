@@ -1,11 +1,11 @@
 """
 LeafTS Playground
 =================
-• Wybierz płytkę → wygeneruj gotowy projekt (pliki C)
-• Podłącz przez UART (COM port) lub TCP (emulator)
-• Terminal: pisz komendy LeafTS bezpośrednio w aplikacji
+• Select a board → generate a ready-to-use C project
+• Connect via UART (COM port) or TCP (emulator)
+• Terminal: type LeafTS commands directly in the app
 
-Zależności: PyQt6, pyserial
+Dependencies: PyQt6, pyserial
 """
 
 from __future__ import annotations
@@ -90,13 +90,13 @@ COMMON_FILES = [
 # ---------------------------------------------------------------------------
 
 def _flash_region(b: dict) -> tuple[int, int]:
-    base = b["flash_base"]
-    size = b["flash_size"]
+    base = b.get("flash_base", 0)
+    size = b.get("flash_size", 65536)
     if base != 0:
         return base, size
     # NOR-style (ESP32, RP2040 etc.) — reserve first 512 KB for firmware
     db_base = 0x80000
-    db_size = max(size - 0x80000, b["page_size"] * 4)
+    db_size = max(size - 0x80000, b.get("page_size", 256) * 4)
     return db_base, db_size
 
 
@@ -189,7 +189,7 @@ def make_main_c(b: dict) -> str:
 
 
 def generate_project(b: dict, dest: Path) -> list[str]:
-    """Copy all needed files to dest. Returns list of relative paths (or '[BRAK] ...')."""
+    """Copy all needed files to dest. Returns list of relative paths (or '[MISSING] ...')."""
     meta   = FAMILY_META.get(b["family"], {"fn": "hal_flash_init", "h": "hal_flash.h", "c": ""})
     copied: list[str] = []
 
@@ -201,7 +201,7 @@ def generate_project(b: dict, dest: Path) -> list[str]:
             shutil.copy2(src, dst)
             copied.append(dst_rel)
         else:
-            copied.append(f"[BRAK] {src_rel}")
+            copied.append(f"[MISSING] {src_rel}")
 
     for src_rel, dst_rel in COMMON_FILES:
         cp(src_rel, dst_rel)
@@ -211,7 +211,7 @@ def generate_project(b: dict, dest: Path) -> list[str]:
         cp(f'src/{meta["c"]}', f'src/{meta["c"]}')
 
     (dest / "main.c").write_text(make_main_c(b), encoding="utf-8")
-    copied.append("main.c  ← wygenerowany")
+    copied.append("main.c  ← generated")
 
     return copied
 
@@ -243,8 +243,8 @@ class TcpBackend(Backend):
     def _start_server(self):
         if not SERVER_EXE.exists():
             self.disconnected.emit(
-                f"Nie znaleziono {SERVER_EXE.name}. "
-                "Zbuduj: cmake --build build --target leafts_uart"
+                f"Could not find {SERVER_EXE.name}. "
+                "Build it: cmake --build build --target leafts_uart"
             )
             return
         try:
@@ -255,7 +255,7 @@ class TcpBackend(Backend):
             )
             time.sleep(0.5)
         except OSError as e:
-            self.disconnected.emit(f"Błąd uruchamiania serwera: {e}")
+            self.disconnected.emit(f"Server start error: {e}")
 
     def _connect_socket(self):
         for _ in range(12):
@@ -271,7 +271,7 @@ class TcpBackend(Backend):
                 return
             except OSError:
                 time.sleep(0.3)
-        self.disconnected.emit("Nie można połączyć z leafts_uart.exe (port 5555).")
+        self.disconnected.emit("Cannot connect to leafts_uart.exe (port 5555).")
 
     def _read_loop(self):
         buf = b""
@@ -282,7 +282,7 @@ class TcpBackend(Backend):
             try:
                 chunk = self._sock.recv(1024)
                 if not chunk:
-                    self.disconnected.emit("Serwer rozłączył się.")
+                    self.disconnected.emit("Server disconnected.")
                     return
                 buf += chunk
                 while b"\n" in buf:
@@ -292,7 +292,7 @@ class TcpBackend(Backend):
                 continue
             except OSError as e:
                 if not self._stop_ev.is_set():
-                    self.disconnected.emit(f"Błąd TCP: {e}")
+                    self.disconnected.emit(f"TCP error: {e}")
                 return
 
     def send(self, cmd: str):
@@ -300,7 +300,7 @@ class TcpBackend(Backend):
             try:
                 self._sock.sendall((cmd.strip() + "\n").encode())
             except OSError:
-                self.disconnected.emit("Utracono połączenie TCP.")
+                self.disconnected.emit("TCP connection lost.")
 
     def stop(self):
         self._stop_ev.set()
@@ -327,7 +327,7 @@ class SerialBackend(Backend):
             time.sleep(0.1)
             self.connected.emit()
         except serial.SerialException as e:
-            self.disconnected.emit(f"Nie można otworzyć {self._port}: {e}")
+            self.disconnected.emit(f"Cannot open {self._port}: {e}")
             return
 
         buf = b""
@@ -341,7 +341,7 @@ class SerialBackend(Backend):
                         self.response.emit(line.decode(errors="replace").rstrip("\r"))
             except serial.SerialException as e:
                 if not self._stop_ev.is_set():
-                    self.disconnected.emit(f"Błąd UART: {e}")
+                    self.disconnected.emit(f"UART error: {e}")
                 return
 
     def send(self, cmd: str):
@@ -349,7 +349,7 @@ class SerialBackend(Backend):
             try:
                 self._ser.write((cmd.strip() + "\r\n").encode())
             except serial.SerialException:
-                self.disconnected.emit("Utracono połączenie UART.")
+                self.disconnected.emit("UART connection lost.")
 
     def stop(self):
         self._stop_ev.set()
@@ -550,7 +550,7 @@ class BoardPanel(QWidget):
         title.setObjectName("boardTitle")
         lay.addWidget(title)
 
-        sub = QLabel("Wybierz płytkę · generuj projekt · podłącz przez UART lub TCP")
+        sub = QLabel("Select a board · generate a project · connect via UART or TCP")
         sub.setStyleSheet("color: #484f58; font-size: 11px;")
         sub.setWordWrap(True)
         lay.addWidget(sub)
@@ -559,12 +559,12 @@ class BoardPanel(QWidget):
         lay.addWidget(sep)
 
         self.search = QLineEdit()
-        self.search.setPlaceholderText("🔍  Szukaj płytki, MCU, vendora...")
+        self.search.setPlaceholderText("🔍  Search board, MCU, vendor...")
         self.search.textChanged.connect(self._filter)
         lay.addWidget(self.search)
 
         self.family_box = QComboBox()
-        self.family_box.addItem("Wszystkie rodziny")
+        self.family_box.addItem("All families")
         self.family_box.currentIndexChanged.connect(self._filter)
         lay.addWidget(self.family_box)
 
@@ -578,7 +578,7 @@ class BoardPanel(QWidget):
         lay.addWidget(self.count_lbl)
 
         # Details
-        grp = QGroupBox("Szczegóły")
+        grp = QGroupBox("Details")
         gl = QVBoxLayout(grp); gl.setSpacing(3)
         self.lbl_name  = QLabel("—")
         self.lbl_mcu   = QLabel("—")
@@ -591,28 +591,28 @@ class BoardPanel(QWidget):
         lay.addWidget(grp)
 
         # Snippet
-        grp2 = QGroupBox("Snippet inicjalizacji")
+        grp2 = QGroupBox("Init snippet")
         gl2 = QVBoxLayout(grp2); gl2.setSpacing(4)
         self.snippet = QTextEdit()
         self.snippet.setReadOnly(True)
         self.snippet.setStyleSheet(SNIPPET_STYLE)
         self.snippet.setMaximumHeight(120)
-        self.snippet.setPlaceholderText("← wybierz płytkę")
+        self.snippet.setPlaceholderText("← select a board")
         gl2.addWidget(self.snippet)
         copy_row = QHBoxLayout()
-        copy_btn = QPushButton("📋  Kopiuj snippet"); copy_btn.setObjectName("copyBtn")
+        copy_btn = QPushButton("📋  Copy snippet"); copy_btn.setObjectName("copyBtn")
         copy_btn.clicked.connect(self._copy_snippet)
         copy_row.addWidget(copy_btn); copy_row.addStretch()
         gl2.addLayout(copy_row)
         lay.addWidget(grp2)
 
         # Generate button
-        self.gen_btn = QPushButton("📁  Generuj projekt C...")
+        self.gen_btn = QPushButton("📁  Generate C project...")
         self.gen_btn.setObjectName("genBtn")
         self.gen_btn.setEnabled(False)
         self.gen_btn.setToolTip(
-            "Generuje main.c + kopiuje pliki HAL i LeafTS do wybranego katalogu.\n"
-            "Następnie dodaj pliki do swojego projektu (Makefile / CMake / STM32CubeIDE)."
+            "Generates main.c and copies HAL + LeafTS files to the selected folder.\n"
+            "Then add the files to your build system (Makefile / CMake / STM32CubeIDE)."
         )
         self.gen_btn.clicked.connect(self._generate)
         lay.addWidget(self.gen_btn)
@@ -623,7 +623,7 @@ class BoardPanel(QWidget):
                 data = json.load(f)
             self.boards = data.get("boards", [])
         except Exception as e:
-            self.count_lbl.setText(f"Błąd ładowania boards.json: {e}")
+            self.count_lbl.setText(f"Error loading boards.json: {e}")
             return
         families = sorted({b["family"] for b in self.boards})
         self.family_box.blockSignals(True)
@@ -647,22 +647,24 @@ class BoardPanel(QWidget):
         self.lst.blockSignals(True)
         self.lst.clear()
         for b in self.filtered:
-            item = QListWidgetItem(f"{b['name']}  [{b['flash_size'] // 1024} KB]")
+            flash_kb = b.get("flash_size", 0) // 1024
+            item = QListWidgetItem(f"{b['name']}  [{flash_kb} KB]")
             item.setData(Qt.ItemDataRole.UserRole, b)
             self.lst.addItem(item)
         self.lst.blockSignals(False)
-        self.count_lbl.setText(f"{len(self.filtered)} / {len(self.boards)} płytek")
+        self.count_lbl.setText(f"{len(self.filtered)} / {len(self.boards)} boards")
 
     def _on_select(self, cur: QListWidgetItem | None, _prev):
         if cur is None:
             return
         b: dict = cur.data(Qt.ItemDataRole.UserRole)
         self._current_board = b
-        flash_kb = b["flash_size"] // 1024
+        flash_size = b.get("flash_size", 0)
+        flash_kb = flash_size // 1024
         self.lbl_name.setText(f"<b>{b['name']}</b>")
-        self.lbl_mcu.setText(f"MCU: {b.get('mcu','?').upper()}  ·  {b['family']}")
-        self.lbl_flash.setText(f"Flash: {flash_kb} KB  ·  {b['flash_size']:,} B")
-        self.lbl_page.setText(f"Strona: {b['page_size']} B  ·  Sektorów: {b['sector_count']}")
+        self.lbl_mcu.setText(f"MCU: {b.get('mcu','?').upper()}  ·  {b.get('family','?')}")
+        self.lbl_flash.setText(f"Flash: {flash_kb} KB  ·  {flash_size:,} B")
+        self.lbl_page.setText(f"Page: {b.get('page_size','?')} B  ·  Sectors: {b.get('sector_count','?')}")
         self.snippet.setPlainText(make_snippet(b))
         self.gen_btn.setEnabled(True)
         self.board_selected.emit(b)
@@ -677,7 +679,7 @@ class BoardPanel(QWidget):
             return
         b = self._current_board
         dest_str = QFileDialog.getExistingDirectory(
-            self, f"Wybierz folder docelowy — {b['name']}",
+            self, f"Select destination folder — {b['name']}",
             str(Path.home()), QFileDialog.Option.ShowDirsOnly,
         )
         if not dest_str:
@@ -686,22 +688,22 @@ class BoardPanel(QWidget):
         try:
             copied = generate_project(b, dest)
         except Exception as e:
-            QMessageBox.critical(self, "Błąd generowania", str(e))
+            QMessageBox.critical(self, "Generation error", str(e))
             return
 
-        ok      = [f for f in copied if not f.startswith("[BRAK]")]
-        missing = [f for f in copied if f.startswith("[BRAK]")]
+        ok      = [f for f in copied if not f.startswith("[MISSING]")]
+        missing = [f for f in copied if f.startswith("[MISSING]")]
         lines = [
             f"<b>{b['name']}</b>",
             f"Folder: <code>{dest}</code>",
             "",
-            f"Skopiowane pliki ({len(ok)}):",
+            f"Copied files ({len(ok)}):",
         ] + [f"&nbsp;&nbsp;✓ {f}" for f in ok]
         if missing:
-            lines += ["", "Brakujące pliki (HAL nie zaimplementowany):"]
+            lines += ["", "Missing files (HAL not implemented):"]
             lines += [f"&nbsp;&nbsp;✗ {f}" for f in missing]
         dlg = QMessageBox(self)
-        dlg.setWindowTitle("Projekt wygenerowany ✓")
+        dlg.setWindowTitle("Project generated ✓")
         dlg.setTextFormat(Qt.TextFormat.RichText)
         dlg.setText("<br>".join(lines))
         dlg.setIcon(QMessageBox.Icon.Information)
@@ -744,11 +746,11 @@ class ConnectionBar(QWidget):
         self.tcp_port.setValue(TCP_PORT)
         self.tcp_port.setMaximumWidth(75)
         tcp_l.addWidget(self.tcp_port)
-        hint = QLabel("(leafts_uart.exe startuje automatycznie)")
+        hint = QLabel("(leafts_uart.exe starts automatically)")
         hint.setStyleSheet("color: #484f58; font-size: 11px;")
         tcp_l.addWidget(hint)
         tcp_l.addStretch()
-        self.tcp_btn = QPushButton("▶  Połącz")
+        self.tcp_btn = QPushButton("▶  Connect")
         self.tcp_btn.setObjectName("connBtn")
         self.tcp_btn.setProperty("connected", "false")
         self.tcp_btn.clicked.connect(self._on_tcp_btn)
@@ -760,13 +762,13 @@ class ConnectionBar(QWidget):
         ser_l  = QHBoxLayout(ser_w)
         ser_l.setContentsMargins(10, 6, 10, 6)
         ser_l.setSpacing(8)
-        ser_l.addWidget(QLabel("Port COM:"))
+        ser_l.addWidget(QLabel("COM Port:"))
         self.ser_port = QComboBox()
         self.ser_port.setMinimumWidth(110)
         ser_l.addWidget(self.ser_port)
         ref_btn = QPushButton("🔄")
         ref_btn.setObjectName("refreshBtn")
-        ref_btn.setToolTip("Odśwież porty COM")
+        ref_btn.setToolTip("Refresh COM ports")
         ref_btn.clicked.connect(self._refresh)
         ser_l.addWidget(ref_btn)
         ser_l.addWidget(QLabel("Baud:"))
@@ -778,7 +780,7 @@ class ConnectionBar(QWidget):
         ser_l.addWidget(self.ser_baud)
         ser_l.addWidget(QLabel("8N1"))
         ser_l.addStretch()
-        self.ser_btn = QPushButton("▶  Połącz")
+        self.ser_btn = QPushButton("▶  Connect")
         self.ser_btn.setObjectName("connBtn")
         self.ser_btn.setProperty("connected", "false")
         self.ser_btn.clicked.connect(self._on_ser_btn)
@@ -795,7 +797,7 @@ class ConnectionBar(QWidget):
             for p in ports:
                 self.ser_port.addItem(p)
         else:
-            self.ser_port.addItem("(brak portów COM)")
+            self.ser_port.addItem("(no COM ports)")
 
     def _on_tcp_btn(self):
         if self._connected:
@@ -815,8 +817,8 @@ class ConnectionBar(QWidget):
     def set_connected(self, ok: bool):
         self._connected = ok
         val = "true" if ok else "false"
-        lbl_on  = "⏹  Rozłącz"
-        lbl_off = "▶  Połącz"
+        lbl_on  = "⏹  Disconnect"
+        lbl_off = "▶  Connect"
         for btn in (self.tcp_btn, self.ser_btn):
             btn.setProperty("connected", val)
             btn.setText(lbl_on if ok else lbl_off)
@@ -846,15 +848,15 @@ class TerminalPanel(QWidget):
 
         # Header
         hdr = QHBoxLayout()
-        t = QLabel("Konsola  /  LeafTS")
+        t = QLabel("Terminal  /  LeafTS")
         t.setStyleSheet("color: #58a6ff; font-size: 14px; font-weight: bold;")
         hdr.addWidget(t); hdr.addStretch()
-        self.status_lbl = QLabel("⏸  Rozłączono")
+        self.status_lbl = QLabel("⏸  Disconnected")
         self.status_lbl.setObjectName("statusErr")
         hdr.addWidget(self.status_lbl)
         lay.addLayout(hdr)
 
-        self.board_lbl = QLabel("← wybierz płytkę z listy po lewej")
+        self.board_lbl = QLabel("← select a board from the list on the left")
         self.board_lbl.setStyleSheet("color: #484f58; font-size: 11px; font-style: italic;")
         lay.addWidget(self.board_lbl)
 
@@ -880,15 +882,15 @@ class TerminalPanel(QWidget):
             "font-size: 13px; font-weight: bold;")
         inp.addWidget(self.prompt_lbl)
         self.input = QLineEdit()
-        self.input.setPlaceholderText("wpisz komendę...  (Enter = wyślij  ·  ↑↓ = historia)")
+        self.input.setPlaceholderText("type command...  (Enter = send  ·  ↑↓ = history)")
         self.input.setFont(QFont("Consolas", 13))
         self.input.returnPressed.connect(self._send)
         self.input.installEventFilter(self)
         inp.addWidget(self.input)
-        send_btn = QPushButton("Wyślij"); send_btn.setObjectName("sendBtn")
+        send_btn = QPushButton("Send"); send_btn.setObjectName("sendBtn")
         send_btn.clicked.connect(self._send)
         inp.addWidget(send_btn)
-        clr_btn = QPushButton("Wyczyść"); clr_btn.setObjectName("clearBtn")
+        clr_btn = QPushButton("Clear"); clr_btn.setObjectName("clearBtn")
         clr_btn.clicked.connect(self.output.clear)
         inp.addWidget(clr_btn)
         lay.addLayout(inp)
@@ -940,10 +942,10 @@ class TerminalPanel(QWidget):
         self.output.moveCursor(QTextCursor.MoveOperation.End)
 
     def set_status(self, state: str):
-        m = {"ok": ("statusOk", "🟢  Połączono"),
-             "err": ("statusErr", "🔴  Rozłączono"),
-             "wait": ("statusWait", "⏳  Łączenie...")}
-        obj, txt = m.get(state, ("statusErr", "⏸  Rozłączono"))
+        m = {"ok": ("statusOk", "🟢  Connected"),
+             "err": ("statusErr", "🔴  Disconnected"),
+             "wait": ("statusWait", "⏳  Connecting...")}
+        obj, txt = m.get(state, ("statusErr", "⏸  Disconnected"))
         self.status_lbl.setObjectName(obj)
         self.status_lbl.setText(txt)
         self.status_lbl.style().unpolish(self.status_lbl)
@@ -997,13 +999,13 @@ class MainWindow(QMainWindow):
             self.terminal_panel.output.clear)
 
         self.terminal_panel.append_system(
-            "Wybierz tryb połączenia powyżej i kliknij ▶ Połącz.", "#484f58")
+            "Select a connection mode above and click ▶ Connect.", "#484f58")
         self.terminal_panel.focus_input()
 
     def _start_tcp(self):
         self._stop_backend()
         self.terminal_panel.set_status("wait")
-        self.terminal_panel.append_system("Uruchamianie leafts_uart.exe...", "#d29922")
+        self.terminal_panel.append_system("Starting leafts_uart.exe...", "#d29922")
         self._backend = TcpBackend()
         self._wire()
         self._backend.start()
@@ -1011,7 +1013,7 @@ class MainWindow(QMainWindow):
     def _start_serial(self, port: str, baud: int):
         self._stop_backend()
         self.terminal_panel.set_status("wait")
-        self.terminal_panel.append_system(f"Łączenie z {port}  @  {baud}...", "#d29922")
+        self.terminal_panel.append_system(f"Connecting to {port}  @  {baud}...", "#d29922")
         self._backend = SerialBackend(port, baud)
         self._wire()
         self._backend.start()
@@ -1025,7 +1027,7 @@ class MainWindow(QMainWindow):
         self._stop_backend()
         self.terminal_panel.set_status("err")
         self.terminal_panel.conn_bar.set_connected(False)
-        self.terminal_panel.append_system("Rozłączono.", "#f85149")
+        self.terminal_panel.append_system("Disconnected.", "#f85149")
 
     def _stop_backend(self):
         if self._backend:
@@ -1038,20 +1040,20 @@ class MainWindow(QMainWindow):
         self.terminal_panel.conn_bar.set_connected(True)
         mode = self.terminal_panel.conn_bar.current_mode()
         self.terminal_panel.append_system(
-            "Połączono z leafts_uart.exe  (RAM flash)" if mode == "tcp"
-            else "Połączono przez UART.", "#3fb950")
-        self.terminal_panel.append_system("Wpisz 'status' żeby sprawdzić bazę.", "#56d364")
+            "Connected to leafts_uart.exe  (RAM flash)" if mode == "tcp"
+            else "Connected via UART.", "#3fb950")
+        self.terminal_panel.append_system("Type 'status' to check the database.", "#56d364")
 
     def _on_err(self, reason: str):
         self.terminal_panel.set_status("err")
         self.terminal_panel.conn_bar.set_connected(False)
-        self.terminal_panel.append_system(f"Rozłączono: {reason}", "#f85149")
+        self.terminal_panel.append_system(f"Disconnected: {reason}", "#f85149")
 
     def _send(self, cmd: str):
         if self._backend:
             self._backend.send(cmd)
         else:
-            self.terminal_panel.append_system("Nie połączono — kliknij ▶ Połącz.", "#d29922")
+            self.terminal_panel.append_system("Not connected — click ▶ Connect.", "#d29922")
             self.terminal_panel.append_response("ERR not_connected")
 
     def closeEvent(self, ev):
