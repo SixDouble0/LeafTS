@@ -9,7 +9,7 @@
 // Note: STM32F4 uses "USART v1" register layout (SR + DR — single data register)
 //       unlike STM32L4/G0 which use "USART v2" (ISR + RDR + TDR).
 
-#include "../hal/hal_stm32f4_uart.h"
+#include "../../hal/stm32/hal_stm32f4_uart.h"
 #include <stdint.h>
 
 // ---------------------------------------------------------------------------

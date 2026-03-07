@@ -11,7 +11,7 @@
 //   - erase cleans up CR (PER, STRT, PNB cleared after operation)
 //   - read returns 0xFF on freshly erased "flash"
 #include "../unity/unity.h"
-#include "../hal/hal_stm32l4_flash.h"
+#include "../hal/stm32/hal_stm32l4_flash.h"
 #include <string.h>
 #include <stdint.h>
 

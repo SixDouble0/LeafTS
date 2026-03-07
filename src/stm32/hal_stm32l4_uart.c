@@ -2,7 +2,7 @@
 // Registers from RM0394 §40.
 // Works on real hardware AND in Renode (STM32F7_USART model emulates these regs).
 
-#include "../hal/hal_stm32l4_uart.h"
+#include "../../hal/stm32/hal_stm32l4_uart.h"
 #include <stdint.h>
 
 // ---------------------------------------------------------------------------

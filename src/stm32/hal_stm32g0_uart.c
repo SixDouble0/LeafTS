@@ -13,7 +13,7 @@
 //   - RCC_APBENR2 at 0x40021018 (USART1 clock enable)
 // USART register layout (ISR/RDR/TDR) is identical to STM32L4.
 
-#include "../hal/hal_stm32g0_uart.h"
+#include "../../hal/stm32/hal_stm32g0_uart.h"
 #include <stdint.h>
 
 // ---------------------------------------------------------------------------

@@ -18,7 +18,7 @@
 
 #include <string.h>
 #include <stdint.h>
-#include "../hal/hal_nrf52_flash.h"
+#include "../../hal/nrf/hal_nrf52_flash.h"
 
 // ---------------------------------------------------------------------------
 // NVMC register map (nRF52840 PS §4.3.1)

@@ -6,7 +6,7 @@
 // Pinout: PA9 = TX (AF push-pull), PA10 = RX (input floating)
 // Baud  : 115200 @ 72 MHz APB2 (standard HSE 8 MHz + PLL ×9)
 
-#include "../hal/hal_stm32f1_uart.h"
+#include "../../hal/stm32/hal_stm32f1_uart.h"
 #include <stdint.h>
 
 // ---------------------------------------------------------------------------

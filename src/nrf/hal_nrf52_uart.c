@@ -8,7 +8,7 @@
 // Note: TX/RX pin numbers are written directly to the PSELTXD/PSELRXD registers.
 //       Disconnect a pin by writing 0xFFFFFFFF (bit 31 = CONNECT=1).
 
-#include "../hal/hal_nrf52_uart.h"
+#include "../../hal/nrf/hal_nrf52_uart.h"
 #include <stdint.h>
 
 // ---------------------------------------------------------------------------

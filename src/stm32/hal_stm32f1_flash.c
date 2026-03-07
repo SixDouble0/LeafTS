@@ -10,7 +10,7 @@
 
 #include <string.h>
 #include <stdint.h>
-#include "../hal/hal_stm32f1_flash.h"
+#include "../../hal/stm32/hal_stm32f1_flash.h"
 
 // ---------------------------------------------------------------------------
 // FLASH register map (RM0008 §3.3)

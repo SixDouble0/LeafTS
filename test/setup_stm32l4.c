@@ -3,7 +3,7 @@
 // For a new family: copy this file, change 4 numbers and the init function.
 
 #include "hal_flash_contract.h"
-#include "../hal/hal_stm32l4_flash.h"
+#include "../hal/stm32/hal_stm32l4_flash.h"
 
 void hal_test_get_config(HalFlashTestConfig *cfg) {
     cfg->init       = stm32l4_flash_init;

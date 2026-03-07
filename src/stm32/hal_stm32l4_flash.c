@@ -9,7 +9,7 @@
 
 #include <string.h>
 #include <stdint.h>
-#include "../hal/hal_stm32l4_flash.h"
+#include "../../hal/stm32/hal_stm32l4_flash.h"
 
 // ---------------------------------------------------------------------------
 // FLASH register map (RM0394 §3.7)

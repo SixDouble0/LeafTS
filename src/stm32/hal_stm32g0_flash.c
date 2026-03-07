@@ -12,7 +12,7 @@
 
 #include <string.h>
 #include <stdint.h>
-#include "../hal/hal_stm32g0_flash.h"
+#include "../../hal/stm32/hal_stm32g0_flash.h"
 
 // ---------------------------------------------------------------------------
 // FLASH register map (RM0444 §3.6  — same base and offsets as STM32L4)
