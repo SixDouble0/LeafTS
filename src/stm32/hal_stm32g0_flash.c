@@ -24,9 +24,40 @@
 #define MCU_FLASH_BASE  0x08000000UL
 #endif
 
-#define FLASH_KEYR  (*(volatile uint32_t *)(FLASH_REG_BASE + 0x08))
-#define FLASH_SR    (*(volatile uint32_t *)(FLASH_REG_BASE + 0x10))
-#define FLASH_CR    (*(volatile uint32_t *)(FLASH_REG_BASE + 0x14))
+// ---------------------------------------------------------------------------
+// Register base indirection for host-side mock testing.
+// When LEAFTS_MOCK_FLASH is defined, _mock_set_flash_bases() redirects all
+// register accesses and memory accesses to RAM buffers supplied by the test.
+// ---------------------------------------------------------------------------
+#ifdef LEAFTS_MOCK_FLASH
+static uintptr_t s_reg_base = FLASH_REG_BASE;
+static uintptr_t s_mcu_base = MCU_FLASH_BASE;
+static uintptr_t s_mem_base = 0;
+static uint32_t  s_log_base = 0;
+void _mock_set_flash_bases(uintptr_t reg_base, uintptr_t mem_base, uint32_t log_base) {
+    s_reg_base = reg_base;
+    s_mcu_base = (uintptr_t)log_base;
+    s_mem_base = mem_base;
+    s_log_base = log_base;
+}
+#define EFFECTIVE_REG_BASE  s_reg_base
+#define EFFECTIVE_MCU_BASE  s_mcu_base
+#else
+#define EFFECTIVE_REG_BASE  ((uintptr_t)FLASH_REG_BASE)
+#define EFFECTIVE_MCU_BASE  ((uintptr_t)MCU_FLASH_BASE)
+#endif
+
+static inline void *flash_ptr(uint32_t address) {
+#ifdef LEAFTS_MOCK_FLASH
+    return (void *)(s_mem_base + (address - s_log_base));
+#else
+    return (void *)(uintptr_t)address;
+#endif
+}
+
+#define FLASH_KEYR  (*(volatile uint32_t *)(EFFECTIVE_REG_BASE + 0x08))
+#define FLASH_SR    (*(volatile uint32_t *)(EFFECTIVE_REG_BASE + 0x10))
+#define FLASH_CR    (*(volatile uint32_t *)(EFFECTIVE_REG_BASE + 0x14))
 
 // FLASH_SR bits (RM0444 §3.6.4) — identical to STM32L4
 #define SR_EOP      (1UL <<  0)
@@ -81,6 +112,9 @@ static void flash_lock(void)
 static void flash_wait_busy(void)
 {
     while (FLASH_SR & SR_BSY) { /* spin */ }
+#ifdef LEAFTS_MOCK_FLASH
+    FLASH_SR |= SR_EOP;   // simulate hardware asserting EOP when operation completes
+#endif
 }
 
 static int flash_check_errors(void)
@@ -103,7 +137,7 @@ static int g0_read(uint32_t address, uint8_t *buffer, size_t size)
     if (address < g_base)                 { return -1; }
     if (address + size > g_base + g_size) { return -1; }
 
-    memcpy(buffer, (const void *)(uintptr_t)address, size);
+    memcpy(buffer, flash_ptr(address), size);
     return 0;
 }
 
@@ -124,7 +158,7 @@ static int g0_write(uint32_t address, const uint8_t *buffer, size_t size)
     FLASH_CR |= CR_PG;
 
     const uint32_t *src = (const uint32_t *)(uintptr_t)buffer;
-    volatile uint32_t *dst = (volatile uint32_t *)(uintptr_t)address;
+    volatile uint32_t *dst = (volatile uint32_t *)flash_ptr(address);
 
     for (size_t i = 0; i < size / DWORD_SIZE; i++) {
         // Two 32-bit writes program one 64-bit double-word
@@ -155,7 +189,7 @@ static int g0_erase(uint32_t sector_address)
     if (sector_address % PAGE_SIZE_BYTES != 0)              { return -1; }
 
     // Calculate page number (0-based from start of physical flash)
-    uint32_t page = (sector_address - (uint32_t)MCU_FLASH_BASE) / PAGE_SIZE_BYTES;
+    uint32_t page = (sector_address - (uint32_t)EFFECTIVE_MCU_BASE) / PAGE_SIZE_BYTES;
 
     flash_unlock();
     flash_wait_busy();
@@ -167,7 +201,7 @@ static int g0_erase(uint32_t sector_address)
     flash_wait_busy();
 
     int err = flash_check_errors();
-    FLASH_CR &= ~(CR_PER | CR_PNB_MASK);
+    FLASH_CR &= ~(CR_PER | CR_PNB_MASK | CR_STRT);
     flash_lock();
 
     if (err != 0)             { return -1; }
@@ -182,6 +216,7 @@ static int g0_erase(uint32_t sector_address)
 int stm32g0_flash_init(hal_flash_t *flash, uint32_t flash_base, uint32_t total_size)
 {
     if (!flash)                              { return -1; }
+    if (flash_base < (uint32_t)MCU_FLASH_BASE) { return -1; }
     if (total_size == 0)                     { return -1; }
     if (total_size % PAGE_SIZE_BYTES != 0)   { return -1; }
 

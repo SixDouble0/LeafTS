@@ -18,13 +18,40 @@
 // ---------------------------------------------------------------------------
 // FLASH register map (RM0316 §3.7 — identical to RM0008 STM32F1)
 // ---------------------------------------------------------------------------
+#ifndef FLASH_REG_BASE
 #define FLASH_REG_BASE  0x40022000UL
+#endif
+#ifndef MCU_FLASH_BASE
 #define MCU_FLASH_BASE  0x08000000UL
+#endif
 
-#define FLASH_KEYR  (*(volatile uint32_t *)(FLASH_REG_BASE + 0x04))
-#define FLASH_SR    (*(volatile uint32_t *)(FLASH_REG_BASE + 0x0C))
-#define FLASH_CR    (*(volatile uint32_t *)(FLASH_REG_BASE + 0x10))
-#define FLASH_AR    (*(volatile uint32_t *)(FLASH_REG_BASE + 0x14))
+// Register base indirection for host-side mock testing.
+#ifdef LEAFTS_MOCK_FLASH
+static uintptr_t s_reg_base = FLASH_REG_BASE;
+static uintptr_t s_mem_base = 0;
+static uint32_t  s_log_base = 0;
+void _mock_set_flash_bases(uintptr_t reg_base, uintptr_t mem_base, uint32_t log_base) {
+    s_reg_base = reg_base;
+    s_mem_base = mem_base;
+    s_log_base = log_base;
+}
+#define EFFECTIVE_REG_BASE  s_reg_base
+#else
+#define EFFECTIVE_REG_BASE  ((uintptr_t)FLASH_REG_BASE)
+#endif
+
+static inline void *flash_ptr(uint32_t address) {
+#ifdef LEAFTS_MOCK_FLASH
+    return (void *)(s_mem_base + (address - s_log_base));
+#else
+    return (void *)(uintptr_t)address;
+#endif
+}
+
+#define FLASH_KEYR  (*(volatile uint32_t *)(EFFECTIVE_REG_BASE + 0x04))
+#define FLASH_SR    (*(volatile uint32_t *)(EFFECTIVE_REG_BASE + 0x0C))
+#define FLASH_CR    (*(volatile uint32_t *)(EFFECTIVE_REG_BASE + 0x10))
+#define FLASH_AR    (*(volatile uint32_t *)(EFFECTIVE_REG_BASE + 0x14))
 
 #define SR_BSY      (1UL << 0)
 #define SR_PGERR    (1UL << 2)
@@ -56,7 +83,11 @@ static void flash_unlock(void) {
     if (FLASH_CR & CR_LOCK) { FLASH_KEYR = FLASH_KEY1; FLASH_KEYR = FLASH_KEY2; }
 }
 static void flash_lock(void)      { FLASH_CR |= CR_LOCK; }
-static void flash_wait_busy(void) { while (FLASH_SR & SR_BSY) {} }
+static void flash_wait_busy(void) { while (FLASH_SR & SR_BSY) {}
+#ifdef LEAFTS_MOCK_FLASH
+    FLASH_SR |= SR_EOP;   // simulate hardware asserting EOP when operation completes
+#endif
+}
 static int  flash_check_errors(void) {
     if (FLASH_SR & SR_ALL_ERRORS) { FLASH_SR |= SR_ALL_ERRORS; return -1; }
     return 0;
@@ -68,7 +99,7 @@ static int  flash_check_errors(void) {
 static int f3_read(uint32_t address, uint8_t *buffer, size_t size)
 {
     if (!buffer || address < g_base || address + size > g_base + g_size) return -1;
-    memcpy(buffer, (const void *)(uintptr_t)address, size);
+    memcpy(buffer, flash_ptr(address), size);
     return 0;
 }
 
@@ -83,7 +114,7 @@ static int f3_write(uint32_t address, const uint8_t *buffer, size_t size)
 
     FLASH_CR |= CR_PG;
     const uint16_t *src = (const uint16_t *)(uintptr_t)buffer;
-    volatile uint16_t *dst = (volatile uint16_t *)(uintptr_t)address;
+    volatile uint16_t *dst = (volatile uint16_t *)flash_ptr(address);
 
     for (size_t i = 0; i < size / HWORD_SIZE; i++) {
         dst[i] = src[i];
@@ -113,7 +144,7 @@ static int f3_erase(uint32_t sector_address)
     flash_wait_busy();
 
     int err = flash_check_errors();
-    FLASH_CR &= ~CR_PER;
+    FLASH_CR &= ~(CR_PER | CR_STRT);
     flash_lock();
     if (err != 0 || !(FLASH_SR & SR_EOP)) return -1;
     FLASH_SR |= SR_EOP;
@@ -125,7 +156,9 @@ static int f3_erase(uint32_t sector_address)
 // ---------------------------------------------------------------------------
 int stm32f3_flash_init(hal_flash_t *flash, uint32_t flash_base, uint32_t total_size)
 {
-    if (!flash || total_size == 0 || total_size % PAGE_SIZE_BYTES != 0) return -1;
+    if (!flash) return -1;
+    if (flash_base < (uint32_t)MCU_FLASH_BASE) return -1;
+    if (total_size == 0 || total_size % PAGE_SIZE_BYTES != 0) return -1;
     g_base = flash_base;
     g_size = total_size;
     flash->read        = f3_read;

@@ -153,3 +153,84 @@ hal_check(chk_rp2040_uart     src/rp/hal_rp2040_uart.c)
 # ---- ESP32 ----
 hal_check(chk_esp32_flash     src/esp32/hal_esp32_flash.c)
 hal_check(chk_esp32_uart      src/esp32/hal_esp32_uart.c)
+
+# ---------------------------------------------------------------------------
+# Helper macros: reduce boilerplate for the 15 contract + 13 mock targets.
+# ---------------------------------------------------------------------------
+
+# contract_test(family src_file) — builds a contract-test executable and
+# registers it with CTest.  The universal test logic comes from
+# hal_flash_contract.c; the family-specific config comes from setup_<family>.c.
+function(contract_test family src)
+    set(tgt leafts_test_hal_contract_${family})
+    add_executable(${tgt}
+        test/hal_flash_contract.c
+        test/setup_${family}.c
+        ${src}
+        unity/unity.c
+    )
+    target_include_directories(${tgt} PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/hal
+        ${CMAKE_CURRENT_SOURCE_DIR}/include
+        ${CMAKE_CURRENT_SOURCE_DIR}/unity
+        ${CMAKE_CURRENT_SOURCE_DIR}/test
+    )
+    string(TOUPPER "${family}" FAMILY_UP)
+    add_test(NAME HAL_${FAMILY_UP}_Contract_Tests COMMAND ${tgt})
+endfunction()
+
+# mock_test(family src_file) — builds a mock-MMIO test executable compiled
+# with -DLEAFTS_MOCK_FLASH and registers it with CTest.
+function(mock_test family src)
+    set(tgt leafts_test_hal_${family}_mock)
+    add_executable(${tgt}
+        test/test_hal_${family}_mock.c
+        ${src}
+        unity/unity.c
+    )
+    target_include_directories(${tgt} PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/hal
+        ${CMAKE_CURRENT_SOURCE_DIR}/include
+        ${CMAKE_CURRENT_SOURCE_DIR}/unity
+    )
+    target_compile_definitions(${tgt} PRIVATE LEAFTS_MOCK_FLASH)
+    string(TOUPPER "${family}" FAMILY_UP)
+    add_test(NAME HAL_${FAMILY_UP}_Mock_Tests COMMAND ${tgt})
+endfunction()
+
+# ---------------------------------------------------------------------------
+# Contract tests — one per MCU family (15 families, L4 already registered).
+# ---------------------------------------------------------------------------
+contract_test(stm32f1  src/stm32/hal_stm32f1_flash.c)
+contract_test(stm32f2  src/stm32/hal_stm32f2_flash.c)
+contract_test(stm32f3  src/stm32/hal_stm32f3_flash.c)
+contract_test(stm32f4  src/stm32/hal_stm32f4_flash.c)
+contract_test(stm32f7  src/stm32/hal_stm32f7_flash.c)
+contract_test(stm32g0  src/stm32/hal_stm32g0_flash.c)
+contract_test(stm32g4  src/stm32/hal_stm32g4_flash.c)
+contract_test(stm32h7  src/stm32/hal_stm32h7_flash.c)
+contract_test(stm32l1  src/stm32/hal_stm32l1_flash.c)
+contract_test(stm32l5  src/stm32/hal_stm32l5_flash.c)
+contract_test(stm32wb  src/stm32/hal_stm32wb_flash.c)
+contract_test(stm32wl  src/stm32/hal_stm32wl_flash.c)
+contract_test(nrf52    src/nrf/hal_nrf52_flash.c)
+contract_test(rp2040   src/rp/hal_rp2040_flash.c)
+contract_test(esp32    src/esp32/hal_esp32_flash.c)
+
+# ---------------------------------------------------------------------------
+# Mock MMIO tests — register-level behavioural tests for all hardware-register
+# families (STM32 × 13 + nRF52; RP2040 and ESP32 use stubs, no registers).
+# ---------------------------------------------------------------------------
+mock_test(stm32f1  src/stm32/hal_stm32f1_flash.c)
+mock_test(stm32f2  src/stm32/hal_stm32f2_flash.c)
+mock_test(stm32f3  src/stm32/hal_stm32f3_flash.c)
+mock_test(stm32f4  src/stm32/hal_stm32f4_flash.c)
+mock_test(stm32f7  src/stm32/hal_stm32f7_flash.c)
+mock_test(stm32g0  src/stm32/hal_stm32g0_flash.c)
+mock_test(stm32g4  src/stm32/hal_stm32g4_flash.c)
+mock_test(stm32h7  src/stm32/hal_stm32h7_flash.c)
+mock_test(stm32l1  src/stm32/hal_stm32l1_flash.c)
+mock_test(stm32l5  src/stm32/hal_stm32l5_flash.c)
+mock_test(stm32wb  src/stm32/hal_stm32wb_flash.c)
+mock_test(stm32wl  src/stm32/hal_stm32wl_flash.c)
+mock_test(nrf52    src/nrf/hal_nrf52_flash.c)

@@ -10,12 +10,43 @@
 #include <stdint.h>
 #include "../../hal/stm32/hal_stm32wb_flash.h"
 
+#ifndef FLASH_REG_BASE
 #define FLASH_REG_BASE  0x58004000UL
+#endif
+#ifndef MCU_FLASH_BASE
 #define MCU_FLASH_BASE  0x08000000UL
+#endif
 
-#define FLASH_KEYR  (*(volatile uint32_t *)(FLASH_REG_BASE + 0x08))
-#define FLASH_SR    (*(volatile uint32_t *)(FLASH_REG_BASE + 0x10))
-#define FLASH_CR    (*(volatile uint32_t *)(FLASH_REG_BASE + 0x14))
+// Register base indirection for host-side mock testing.
+#ifdef LEAFTS_MOCK_FLASH
+static uintptr_t s_reg_base = FLASH_REG_BASE;
+static uintptr_t s_mcu_base = MCU_FLASH_BASE;
+static uintptr_t s_mem_base = 0;
+static uint32_t  s_log_base = 0;
+void _mock_set_flash_bases(uintptr_t reg_base, uintptr_t mem_base, uint32_t log_base) {
+    s_reg_base = reg_base;
+    s_mcu_base = (uintptr_t)log_base;
+    s_mem_base = mem_base;
+    s_log_base = log_base;
+}
+#define EFFECTIVE_REG_BASE  s_reg_base
+#define EFFECTIVE_MCU_BASE  s_mcu_base
+#else
+#define EFFECTIVE_REG_BASE  ((uintptr_t)FLASH_REG_BASE)
+#define EFFECTIVE_MCU_BASE  ((uintptr_t)MCU_FLASH_BASE)
+#endif
+
+static inline void *flash_ptr(uint32_t address) {
+#ifdef LEAFTS_MOCK_FLASH
+    return (void *)(s_mem_base + (address - s_log_base));
+#else
+    return (void *)(uintptr_t)address;
+#endif
+}
+
+#define FLASH_KEYR  (*(volatile uint32_t *)(EFFECTIVE_REG_BASE + 0x08))
+#define FLASH_SR    (*(volatile uint32_t *)(EFFECTIVE_REG_BASE + 0x10))
+#define FLASH_CR    (*(volatile uint32_t *)(EFFECTIVE_REG_BASE + 0x14))
 
 #define SR_EOP      (1UL <<  0)
 #define SR_OPERR    (1UL <<  1)
@@ -46,7 +77,11 @@ static void flash_unlock(void) {
     if (FLASH_CR & CR_LOCK) { FLASH_KEYR = FLASH_KEY1; FLASH_KEYR = FLASH_KEY2; }
 }
 static void flash_lock(void)      { FLASH_CR |= CR_LOCK; }
-static void flash_wait_busy(void) { while (FLASH_SR & SR_BSY) {} }
+static void flash_wait_busy(void) { while (FLASH_SR & SR_BSY) {}
+#ifdef LEAFTS_MOCK_FLASH
+    FLASH_SR |= SR_EOP;
+#endif
+}
 static int  flash_check_errors(void) {
     if (FLASH_SR & SR_ALL_ERRORS) { FLASH_SR |= SR_ALL_ERRORS; return -1; }
     return 0;
@@ -54,7 +89,7 @@ static int  flash_check_errors(void) {
 
 static int wb_read(uint32_t address, uint8_t *buffer, size_t size) {
     if (!buffer || address < g_base || address + size > g_base + g_size) return -1;
-    memcpy(buffer, (const void *)(uintptr_t)address, size);
+    memcpy(buffer, flash_ptr(address), size);
     return 0;
 }
 static int wb_write(uint32_t address, const uint8_t *buffer, size_t size) {
@@ -64,7 +99,7 @@ static int wb_write(uint32_t address, const uint8_t *buffer, size_t size) {
     if (flash_check_errors() != 0) { flash_lock(); return -1; }
     FLASH_CR |= CR_PG;
     const uint32_t *src = (const uint32_t *)(uintptr_t)buffer;
-    volatile uint32_t *dst = (volatile uint32_t *)(uintptr_t)address;
+    volatile uint32_t *dst = (volatile uint32_t *)flash_ptr(address);
     for (size_t i = 0; i < size / DWORD_SIZE; i++) {
         dst[0] = src[0]; dst[1] = src[1];
         flash_wait_busy();
@@ -78,20 +113,22 @@ static int wb_erase(uint32_t sector_address) {
     if (sector_address < g_base ||
         sector_address + PAGE_SIZE_BYTES > g_base + g_size ||
         sector_address % PAGE_SIZE_BYTES != 0) return -1;
-    uint32_t page = (sector_address - MCU_FLASH_BASE) / PAGE_SIZE_BYTES;
+    uint32_t page = (sector_address - (uint32_t)EFFECTIVE_MCU_BASE) / PAGE_SIZE_BYTES;
     flash_unlock(); flash_wait_busy();
     if (flash_check_errors() != 0) { flash_lock(); return -1; }
     FLASH_CR = (FLASH_CR & ~CR_PNB_MASK) | CR_PER | (page << CR_PNB_POS);
     FLASH_CR |= CR_STRT; flash_wait_busy();
     int err = flash_check_errors();
-    FLASH_CR &= ~(CR_PER | CR_PNB_MASK); flash_lock();
+    FLASH_CR &= ~(CR_PER | CR_PNB_MASK | CR_STRT); flash_lock();
     if (err != 0 || !(FLASH_SR & SR_EOP)) return -1;
     FLASH_SR |= SR_EOP;
     return 0;
 }
 
 int stm32wb_flash_init(hal_flash_t *flash, uint32_t flash_base, uint32_t total_size) {
-    if (!flash || total_size == 0 || total_size % PAGE_SIZE_BYTES != 0) return -1;
+    if (!flash) return -1;
+    if (flash_base < (uint32_t)MCU_FLASH_BASE) return -1;
+    if (total_size == 0 || total_size % PAGE_SIZE_BYTES != 0) return -1;
     g_base = flash_base; g_size = total_size;
     flash->read = wb_read; flash->write = wb_write; flash->erase = wb_erase;
     flash->total_size = total_size; flash->sector_size = PAGE_SIZE_BYTES;

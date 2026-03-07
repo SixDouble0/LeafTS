@@ -84,7 +84,9 @@ static int rp_erase(uint32_t sector_address)
 
 int rp2040_flash_init(hal_flash_t *flash, uint32_t flash_base, uint32_t total_size)
 {
-    if (!flash || total_size == 0 || total_size % SECTOR_SIZE != 0) return -1;
+    if (!flash) return -1;
+    if (flash_base < XIP_BASE) return -1;   // must be in XIP window
+    if (total_size == 0 || total_size % SECTOR_SIZE != 0) return -1;
     g_base = flash_base; g_size = total_size;
     flash->read  = rp_read;
     flash->write = rp_write;

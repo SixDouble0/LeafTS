@@ -102,8 +102,10 @@ void test_write_unaligned_size_returns_error(void) {
 
 void test_write_out_of_bounds_returns_error(void) {
     uint8_t buf[8] = {0};
-    // start near the end so write would cross the boundary
-    TEST_ASSERT_EQUAL_INT(-1, g_hal.write(g_cfg.base + g_cfg.size - 4, buf, g_cfg.write_unit));
+    // Address is one byte before the end of the region, so the write
+    // (even of the minimum write_unit = 2 bytes) always crosses the boundary.
+    uint32_t last_valid_start = g_cfg.base + g_cfg.size - g_cfg.write_unit;
+    TEST_ASSERT_EQUAL_INT(-1, g_hal.write(last_valid_start + 1, buf, g_cfg.write_unit));
 }
 
 // ---------------------------------------------------------------------------

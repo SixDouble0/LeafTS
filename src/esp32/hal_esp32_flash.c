@@ -70,7 +70,9 @@ static int esp_erase(uint32_t a)
 
 int esp32_flash_init(hal_flash_t *flash, uint32_t flash_base, uint32_t total_size)
 {
-    if (!flash || total_size == 0 || total_size % SECTOR_SIZE != 0) return -1;
+    if (!flash) return -1;
+    if (flash_base + total_size > 0x00400000UL) return -1;  // limit to 4 MB SPI flash
+    if (total_size == 0 || total_size % SECTOR_SIZE != 0) return -1;
     g_base = flash_base; g_size = total_size;
     flash->read  = esp_read;
     flash->write = esp_write;

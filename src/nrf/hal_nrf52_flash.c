@@ -23,11 +23,38 @@
 // ---------------------------------------------------------------------------
 // NVMC register map (nRF52840 PS §4.3.1)
 // ---------------------------------------------------------------------------
+#ifndef NVMC_BASE
 #define NVMC_BASE  0x4001E000UL
+#endif
 
-#define NVMC_READY     (*(volatile uint32_t *)(NVMC_BASE + 0x400))  // bit 0: 1=ready
-#define NVMC_CONFIG    (*(volatile uint32_t *)(NVMC_BASE + 0x504))  // 0=RO, 1=Wen, 2=Een
-#define NVMC_ERASEPAGE (*(volatile uint32_t *)(NVMC_BASE + 0x508))  // write addr to erase
+// Register base indirection for host-side mock testing.
+// NVMC registers are far apart (offsets 0x400, 0x504, 0x508), so the mock
+// array must be large enough to cover 0x50C bytes = 323 uint32_t entries.
+#ifdef LEAFTS_MOCK_FLASH
+static uintptr_t s_reg_base = NVMC_BASE;
+static uintptr_t s_mem_base = 0;
+static uint32_t  s_log_base = 0;
+void _mock_set_flash_bases(uintptr_t reg_base, uintptr_t mem_base, uint32_t log_base) {
+    s_reg_base = reg_base;
+    s_mem_base = mem_base;
+    s_log_base = log_base;
+}
+#define EFFECTIVE_REG_BASE  s_reg_base
+#else
+#define EFFECTIVE_REG_BASE  ((uintptr_t)NVMC_BASE)
+#endif
+
+static inline void *flash_ptr(uint32_t address) {
+#ifdef LEAFTS_MOCK_FLASH
+    return (void *)(s_mem_base + (address - s_log_base));
+#else
+    return (void *)(uintptr_t)address;
+#endif
+}
+
+#define NVMC_READY     (*(volatile uint32_t *)(EFFECTIVE_REG_BASE + 0x400))
+#define NVMC_CONFIG    (*(volatile uint32_t *)(EFFECTIVE_REG_BASE + 0x504))
+#define NVMC_ERASEPAGE (*(volatile uint32_t *)(EFFECTIVE_REG_BASE + 0x508))
 
 #define NVMC_CONFIG_RO   0x00UL
 #define NVMC_CONFIG_WEN  0x01UL
@@ -61,7 +88,7 @@ static int nrf_read(uint32_t address, uint8_t *buffer, size_t size)
     if (address < g_base)                 { return -1; }
     if (address + size > g_base + g_size) { return -1; }
 
-    memcpy(buffer, (const void *)(uintptr_t)address, size);
+    memcpy(buffer, flash_ptr(address), size);
     return 0;
 }
 
@@ -80,7 +107,7 @@ static int nrf_write(uint32_t address, const uint8_t *buffer, size_t size)
     NVMC_CONFIG = NVMC_CONFIG_WEN;  // enable write
 
     const uint32_t *src = (const uint32_t *)(uintptr_t)buffer;
-    volatile uint32_t *dst = (volatile uint32_t *)(uintptr_t)address;
+    volatile uint32_t *dst = (volatile uint32_t *)flash_ptr(address);
 
     for (size_t i = 0; i < size / WORD_SIZE; i++) {
         dst[i] = src[i];
@@ -113,6 +140,7 @@ static int nrf_erase(uint32_t sector_address)
 int nrf52_flash_init(hal_flash_t *flash, uint32_t flash_base, uint32_t total_size)
 {
     if (!flash)                              { return -1; }
+    if (flash_base > 0x000FFFFFul)           { return -1; }   // above nRF52840 max (1 MB)
     if (total_size == 0)                     { return -1; }
     if (total_size % PAGE_SIZE_BYTES != 0)   { return -1; }
 
