@@ -907,9 +907,15 @@ class TerminalPanel(QWidget):
         hint = QLabel(
             "append &lt;ts&gt; &lt;val&gt;  ·  latest  ·  list  ·  "
             "get_last &lt;n&gt;  ·  get_range &lt;ts1&gt; &lt;ts2&gt;  ·  "
-            "get_min  ·  get_max  ·  status  ·  erase"
+            "get_min  ·  get_max  ·  status  ·  erase  ·  "
+            "get_first  ·  get_avg  ·  count  ·  "
+            "get_by_index &lt;n&gt;  ·  get_avg_range &lt;ts1&gt; &lt;ts2&gt;  ·  "
+            "get_stddev  ·  get_sum  ·  get_count_range &lt;ts1&gt; &lt;ts2&gt;  ·  "
+            "get_nth_last &lt;n&gt;  ·  get_above &lt;val&gt;  ·  get_below &lt;val&gt;  ·  "
+            "get_between &lt;v1&gt; &lt;v2&gt;  ·  get_min_range &lt;ts1&gt; &lt;ts2&gt;  ·  "
+            "get_max_range &lt;ts1&gt; &lt;ts2&gt;  ·  get_latest_n &lt;n&gt;  ·  get_median"
         )
-        hint.setStyleSheet("color: #21262d; font-size: 10px;")
+        hint.setStyleSheet("color: #484f58; font-size: 10px;")
         hint.setWordWrap(True)
         lay.addWidget(hint)
 

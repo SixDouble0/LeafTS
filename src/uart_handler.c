@@ -1,11 +1,35 @@
+#include <math.h>
 #include <stdio.h>
 #include <string.h>
 
 #include "../include/uart_handler.h"
 
+// ---------------------------------------------------------------------------
+// Internal helpers
+// ---------------------------------------------------------------------------
+
+// Return the value at rank k (0-based) when sorted ascending — O(n^2), no malloc.
+static float kth_smallest(leafts_db_t *db, uint32_t k)
+{
+    leafts_record_t ri, rj;
+    for (uint32_t i = 0; i < db->record_count; i++) {
+        if (leafts_get_by_index(db, i, &ri) != LEAFTS_OK) continue;
+        uint32_t less = 0, equal = 0;
+        for (uint32_t j = 0; j < db->record_count; j++) {
+            if (leafts_get_by_index(db, j, &rj) != LEAFTS_OK) continue;
+            if      (rj.value < ri.value) less++;
+            else if (rj.value == ri.value) equal++;
+        }
+        if (less <= k && k < less + equal)
+            return ri.value;
+    }
+    return 0.0f;
+}
+
 // HELPER: SEND A NULL-TERMINATED STRING OVER UART
 static void uart_send_str(hal_uart_t *uart, const char *str)
 {
+    // SEND STRING AS BYTES 
     uart->send((const uint8_t *)str, (uint32_t)strlen(str));
 }
 
@@ -22,6 +46,8 @@ static void uart_send_str(hal_uart_t *uart, const char *str)
 //   get_max                     ->  "OK <timestamp> <value>\n"
 //   status                      ->  "OK count=N capacity=N\n"
 //   erase                       ->  "OK\n"
+
+
 int uart_handler_process(const char *line, leafts_db_t *db, hal_uart_t *uart)
 {
     char response[128];
@@ -97,7 +123,7 @@ int uart_handler_process(const char *line, leafts_db_t *db, hal_uart_t *uart)
         return LEAFTS_OK;
     }
 
-    // ---- GET_LAST ----
+    //  GET_LAST 
     if (strncmp(line, "get_last", 8) == 0)
     {
         uint32_t n;
@@ -132,7 +158,7 @@ int uart_handler_process(const char *line, leafts_db_t *db, hal_uart_t *uart)
         return LEAFTS_OK;
     }
 
-    // ---- GET_RANGE ----
+    //  GET_RANGE 
     if (strncmp(line, "get_range", 9) == 0)
     {
         uint32_t ts_from;
@@ -179,7 +205,7 @@ int uart_handler_process(const char *line, leafts_db_t *db, hal_uart_t *uart)
         return LEAFTS_OK;
     }
 
-    // ---- GET_MIN ----
+    //  GET_MIN 
     if (strncmp(line, "get_min", 7) == 0)
     {
         if (db->record_count == 0)
@@ -208,7 +234,7 @@ int uart_handler_process(const char *line, leafts_db_t *db, hal_uart_t *uart)
         return LEAFTS_OK;
     }
 
-    // ---- GET_MAX ----
+    //  GET_MAX 
     if (strncmp(line, "get_max", 7) == 0)
     {
         if (db->record_count == 0)
@@ -264,6 +290,302 @@ int uart_handler_process(const char *line, leafts_db_t *db, hal_uart_t *uart)
         }
 
         return result;
+    }
+
+    //  GET_FIRST
+    if (strncmp(line, "get_first", 9) == 0)
+    {
+        if (db->record_count == 0) { uart_send_str(uart, "ERR empty\n"); return LEAFTS_ERR_EMPTY; }
+        leafts_record_t record;
+        int result = leafts_get_by_index(db, 0, &record);
+        if (result == LEAFTS_OK) {
+            snprintf(response, sizeof(response), "OK %lu %f\n",
+                     (unsigned long)record.timestamp, record.value);
+            uart_send_str(uart, response);
+        } else {
+            snprintf(response, sizeof(response), "ERR %d\n", result);
+            uart_send_str(uart, response);
+        }
+        return result;
+    }
+
+    //  GET_AVG
+    if (strncmp(line, "get_avg_range", 13) == 0)
+    {
+        uint32_t ts_from, ts_to;
+        if (sscanf(line, "get_avg_range %lu %lu", &ts_from, &ts_to) != 2) {
+            uart_send_str(uart, "ERR bad_args\n"); return LEAFTS_ERR_NULL;
+        }
+        double sum = 0.0; uint32_t n = 0;
+        for (uint32_t i = 0; i < db->record_count; i++) {
+            leafts_record_t r;
+            if (leafts_get_by_index(db, i, &r) == LEAFTS_OK &&
+                r.timestamp >= ts_from && r.timestamp <= ts_to)
+            { sum += r.value; n++; }
+        }
+        if (n == 0) { uart_send_str(uart, "ERR empty\n"); return LEAFTS_ERR_EMPTY; }
+        snprintf(response, sizeof(response), "OK %f\n", (float)(sum / n));
+        uart_send_str(uart, response);
+        return LEAFTS_OK;
+    }
+
+    if (strncmp(line, "get_avg", 7) == 0)
+    {
+        if (db->record_count == 0) { uart_send_str(uart, "ERR empty\n"); return LEAFTS_ERR_EMPTY; }
+        double sum = 0.0;
+        for (uint32_t i = 0; i < db->record_count; i++) {
+            leafts_record_t r;
+            if (leafts_get_by_index(db, i, &r) == LEAFTS_OK) sum += r.value;
+        }
+        snprintf(response, sizeof(response), "OK %f\n", (float)(sum / db->record_count));
+        uart_send_str(uart, response);
+        return LEAFTS_OK;
+    }
+
+    //  COUNT
+    if (strncmp(line, "count", 5) == 0)
+    {
+        snprintf(response, sizeof(response), "OK %lu\n", (unsigned long)db->record_count);
+        uart_send_str(uart, response);
+        return LEAFTS_OK;
+    }
+
+    //  GET_BY_INDEX
+    if (strncmp(line, "get_by_index", 12) == 0)
+    {
+        uint32_t idx;
+        if (sscanf(line, "get_by_index %lu", &idx) != 1) {
+            uart_send_str(uart, "ERR bad_args\n"); return LEAFTS_ERR_NULL;
+        }
+        leafts_record_t r;
+        int result = leafts_get_by_index(db, idx, &r);
+        if (result == LEAFTS_OK) {
+            snprintf(response, sizeof(response), "OK %lu %f\n",
+                     (unsigned long)r.timestamp, r.value);
+            uart_send_str(uart, response);
+        } else {
+            snprintf(response, sizeof(response), "ERR %d\n", result);
+            uart_send_str(uart, response);
+        }
+        return result;
+    }
+
+    //  GET_STDDEV
+    if (strncmp(line, "get_stddev", 10) == 0)
+    {
+        if (db->record_count < 2) { uart_send_str(uart, "ERR not_enough\n"); return LEAFTS_ERR_EMPTY; }
+        double sum = 0.0;
+        for (uint32_t i = 0; i < db->record_count; i++) {
+            leafts_record_t r;
+            if (leafts_get_by_index(db, i, &r) == LEAFTS_OK) sum += r.value;
+        }
+        double mean = sum / db->record_count;
+        double sq_sum = 0.0;
+        for (uint32_t i = 0; i < db->record_count; i++) {
+            leafts_record_t r;
+            if (leafts_get_by_index(db, i, &r) == LEAFTS_OK) {
+                double d = r.value - mean; sq_sum += d * d;
+            }
+        }
+        snprintf(response, sizeof(response), "OK %f\n",
+                 (float)sqrt(sq_sum / (db->record_count - 1)));
+        uart_send_str(uart, response);
+        return LEAFTS_OK;
+    }
+
+    //  GET_SUM
+    if (strncmp(line, "get_sum", 7) == 0)
+    {
+        double sum = 0.0;
+        for (uint32_t i = 0; i < db->record_count; i++) {
+            leafts_record_t r;
+            if (leafts_get_by_index(db, i, &r) == LEAFTS_OK) sum += r.value;
+        }
+        snprintf(response, sizeof(response), "OK %f\n", (float)sum);
+        uart_send_str(uart, response);
+        return LEAFTS_OK;
+    }
+
+    //  GET_COUNT_RANGE
+    if (strncmp(line, "get_count_range", 15) == 0)
+    {
+        uint32_t ts_from, ts_to;
+        if (sscanf(line, "get_count_range %lu %lu", &ts_from, &ts_to) != 2) {
+            uart_send_str(uart, "ERR bad_args\n"); return LEAFTS_ERR_NULL;
+        }
+        uint32_t n = 0;
+        for (uint32_t i = 0; i < db->record_count; i++) {
+            leafts_record_t r;
+            if (leafts_get_by_index(db, i, &r) == LEAFTS_OK &&
+                r.timestamp >= ts_from && r.timestamp <= ts_to) n++;
+        }
+        snprintf(response, sizeof(response), "OK %lu\n", (unsigned long)n);
+        uart_send_str(uart, response);
+        return LEAFTS_OK;
+    }
+
+    //  GET_NTH_LAST
+    if (strncmp(line, "get_nth_last", 12) == 0)
+    {
+        uint32_t n;
+        if (sscanf(line, "get_nth_last %lu", &n) != 1) {
+            uart_send_str(uart, "ERR bad_args\n"); return LEAFTS_ERR_NULL;
+        }
+        if (n == 0 || n > db->record_count) {
+            uart_send_str(uart, "ERR bounds\n"); return LEAFTS_ERR_BOUNDS;
+        }
+        leafts_record_t r;
+        int result = leafts_get_by_index(db, db->record_count - n, &r);
+        if (result == LEAFTS_OK) {
+            snprintf(response, sizeof(response), "OK %lu %f\n",
+                     (unsigned long)r.timestamp, r.value);
+            uart_send_str(uart, response);
+        } else {
+            snprintf(response, sizeof(response), "ERR %d\n", result);
+            uart_send_str(uart, response);
+        }
+        return result;
+    }
+
+    //  GET_ABOVE
+    if (strncmp(line, "get_above", 9) == 0)
+    {
+        float threshold;
+        if (sscanf(line, "get_above %f", &threshold) != 1) {
+            uart_send_str(uart, "ERR bad_args\n"); return LEAFTS_ERR_NULL;
+        }
+        uint32_t n = 0;
+        for (uint32_t i = 0; i < db->record_count; i++) {
+            leafts_record_t r;
+            if (leafts_get_by_index(db, i, &r) == LEAFTS_OK && r.value > threshold) n++;
+        }
+        snprintf(response, sizeof(response), "OK %lu\n", (unsigned long)n);
+        uart_send_str(uart, response);
+        for (uint32_t i = 0; i < db->record_count; i++) {
+            leafts_record_t r;
+            if (leafts_get_by_index(db, i, &r) == LEAFTS_OK && r.value > threshold) {
+                snprintf(response, sizeof(response), "%lu %f\n",
+                         (unsigned long)r.timestamp, r.value);
+                uart_send_str(uart, response);
+            }
+        }
+        return LEAFTS_OK;
+    }
+
+    //  GET_BELOW
+    if (strncmp(line, "get_below", 9) == 0)
+    {
+        float threshold;
+        if (sscanf(line, "get_below %f", &threshold) != 1) {
+            uart_send_str(uart, "ERR bad_args\n"); return LEAFTS_ERR_NULL;
+        }
+        uint32_t n = 0;
+        for (uint32_t i = 0; i < db->record_count; i++) {
+            leafts_record_t r;
+            if (leafts_get_by_index(db, i, &r) == LEAFTS_OK && r.value < threshold) n++;
+        }
+        snprintf(response, sizeof(response), "OK %lu\n", (unsigned long)n);
+        uart_send_str(uart, response);
+        for (uint32_t i = 0; i < db->record_count; i++) {
+            leafts_record_t r;
+            if (leafts_get_by_index(db, i, &r) == LEAFTS_OK && r.value < threshold) {
+                snprintf(response, sizeof(response), "%lu %f\n",
+                         (unsigned long)r.timestamp, r.value);
+                uart_send_str(uart, response);
+            }
+        }
+        return LEAFTS_OK;
+    }
+
+    //  GET_BETWEEN
+    if (strncmp(line, "get_between", 11) == 0)
+    {
+        float v1, v2;
+        if (sscanf(line, "get_between %f %f", &v1, &v2) != 2) {
+            uart_send_str(uart, "ERR bad_args\n"); return LEAFTS_ERR_NULL;
+        }
+        uint32_t n = 0;
+        for (uint32_t i = 0; i < db->record_count; i++) {
+            leafts_record_t r;
+            if (leafts_get_by_index(db, i, &r) == LEAFTS_OK &&
+                r.value >= v1 && r.value <= v2) n++;
+        }
+        snprintf(response, sizeof(response), "OK %lu\n", (unsigned long)n);
+        uart_send_str(uart, response);
+        for (uint32_t i = 0; i < db->record_count; i++) {
+            leafts_record_t r;
+            if (leafts_get_by_index(db, i, &r) == LEAFTS_OK &&
+                r.value >= v1 && r.value <= v2) {
+                snprintf(response, sizeof(response), "%lu %f\n",
+                         (unsigned long)r.timestamp, r.value);
+                uart_send_str(uart, response);
+            }
+        }
+        return LEAFTS_OK;
+    }
+
+    //  GET_MIN_RANGE / GET_MAX_RANGE
+    if (strncmp(line, "get_min_range", 13) == 0 || strncmp(line, "get_max_range", 13) == 0)
+    {
+        int is_min = (line[5] == 'i'); /* get_m[i]n_range vs get_m[a]x_range */
+        uint32_t ts_from, ts_to;
+        if (sscanf(line + (is_min ? 13 : 13), " %lu %lu", &ts_from, &ts_to) != 2) {
+            uart_send_str(uart, "ERR bad_args\n"); return LEAFTS_ERR_NULL;
+        }
+        int found = 0;
+        leafts_record_t best;
+        for (uint32_t i = 0; i < db->record_count; i++) {
+            leafts_record_t r;
+            if (leafts_get_by_index(db, i, &r) == LEAFTS_OK &&
+                r.timestamp >= ts_from && r.timestamp <= ts_to) {
+                if (!found || (is_min ? r.value < best.value : r.value > best.value)) {
+                    best = r; found = 1;
+                }
+            }
+        }
+        if (!found) { uart_send_str(uart, "ERR empty\n"); return LEAFTS_ERR_EMPTY; }
+        snprintf(response, sizeof(response), "OK %lu %f\n",
+                 (unsigned long)best.timestamp, best.value);
+        uart_send_str(uart, response);
+        return LEAFTS_OK;
+    }
+
+    //  GET_LATEST_N (alias for get_last)
+    if (strncmp(line, "get_latest_n", 12) == 0)
+    {
+        uint32_t n;
+        if (sscanf(line, "get_latest_n %lu", &n) != 1) {
+            uart_send_str(uart, "ERR bad_args\n"); return LEAFTS_ERR_NULL;
+        }
+        if (n > db->record_count) n = db->record_count;
+        snprintf(response, sizeof(response), "OK %lu\n", (unsigned long)n);
+        uart_send_str(uart, response);
+        uint32_t start = db->record_count - n;
+        for (uint32_t i = start; i < db->record_count; i++) {
+            leafts_record_t r;
+            if (leafts_get_by_index(db, i, &r) == LEAFTS_OK) {
+                snprintf(response, sizeof(response), "%lu %f\n",
+                         (unsigned long)r.timestamp, r.value);
+                uart_send_str(uart, response);
+            }
+        }
+        return LEAFTS_OK;
+    }
+
+    //  GET_MEDIAN
+    if (strncmp(line, "get_median", 10) == 0)
+    {
+        if (db->record_count == 0) { uart_send_str(uart, "ERR empty\n"); return LEAFTS_ERR_EMPTY; }
+        uint32_t n = db->record_count;
+        float median;
+        if (n % 2 == 1) {
+            median = kth_smallest(db, n / 2);
+        } else {
+            median = (kth_smallest(db, n / 2 - 1) + kth_smallest(db, n / 2)) * 0.5f;
+        }
+        snprintf(response, sizeof(response), "OK %f\n", median);
+        uart_send_str(uart, response);
+        return LEAFTS_OK;
     }
 
     //  UNKNOWN COMMAND 

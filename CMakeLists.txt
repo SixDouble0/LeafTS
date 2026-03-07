@@ -99,6 +99,9 @@ target_include_directories(leafts_uart PRIVATE
 if(WIN32)
     target_link_libraries(leafts_uart PRIVATE ws2_32)
 endif()
+if(UNIX)
+    target_link_libraries(leafts_uart PRIVATE m)
+endif()
 
 # ---------------------------------------------------------------------------
 # HAL compile-check targets
