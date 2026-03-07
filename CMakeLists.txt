@@ -116,3 +116,79 @@ target_include_directories(hal_stm32l4_obj PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/hal
     ${CMAKE_CURRENT_SOURCE_DIR}/include
 )
+
+add_library(hal_stm32l4_uart_obj OBJECT
+    src/hal_stm32l4_uart.c
+)
+target_include_directories(hal_stm32l4_uart_obj PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/hal
+    ${CMAKE_CURRENT_SOURCE_DIR}/include
+)
+
+# STM32F1 (RM0008 — Blue Pill / NUCLEO-F103RB, medium- and high-density)
+add_library(hal_stm32f1_flash_obj OBJECT
+    src/hal_stm32f1_flash.c
+)
+target_include_directories(hal_stm32f1_flash_obj PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/hal
+    ${CMAKE_CURRENT_SOURCE_DIR}/include
+)
+
+add_library(hal_stm32f1_uart_obj OBJECT
+    src/hal_stm32f1_uart.c
+)
+target_include_directories(hal_stm32f1_uart_obj PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/hal
+    ${CMAKE_CURRENT_SOURCE_DIR}/include
+)
+
+# STM32F4 (RM0090 — STM32F407 Discovery / NUCLEO-F411RE, non-uniform sectors)
+add_library(hal_stm32f4_flash_obj OBJECT
+    src/hal_stm32f4_flash.c
+)
+target_include_directories(hal_stm32f4_flash_obj PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/hal
+    ${CMAKE_CURRENT_SOURCE_DIR}/include
+)
+
+add_library(hal_stm32f4_uart_obj OBJECT
+    src/hal_stm32f4_uart.c
+)
+target_include_directories(hal_stm32f4_uart_obj PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/hal
+    ${CMAKE_CURRENT_SOURCE_DIR}/include
+)
+
+# STM32G0 (RM0444 — NUCLEO-G031K8, same flash controller as L4 but single-bank)
+add_library(hal_stm32g0_flash_obj OBJECT
+    src/hal_stm32g0_flash.c
+)
+target_include_directories(hal_stm32g0_flash_obj PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/hal
+    ${CMAKE_CURRENT_SOURCE_DIR}/include
+)
+
+add_library(hal_stm32g0_uart_obj OBJECT
+    src/hal_stm32g0_uart.c
+)
+target_include_directories(hal_stm32g0_uart_obj PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/hal
+    ${CMAKE_CURRENT_SOURCE_DIR}/include
+)
+
+# nRF52 (nRF52840-DK / nRF52-DK — Nordic NVMC + legacy UART0)
+add_library(hal_nrf52_flash_obj OBJECT
+    src/hal_nrf52_flash.c
+)
+target_include_directories(hal_nrf52_flash_obj PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/hal
+    ${CMAKE_CURRENT_SOURCE_DIR}/include
+)
+
+add_library(hal_nrf52_uart_obj OBJECT
+    src/hal_nrf52_uart.c
+)
+target_include_directories(hal_nrf52_uart_obj PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/hal
+    ${CMAKE_CURRENT_SOURCE_DIR}/include
+)
