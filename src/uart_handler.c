@@ -37,6 +37,7 @@ static void uart_send_str(hal_uart_t *uart, const char *str)
 
 // PROCESS ONE COMPLETE LINE - DISPATCH TO CORRECT leafts_* FUNCTION
 // PROTOCOL:
+//   hello                       ->  "OK hello\n"
 //   append <timestamp> <value>  ->  "OK\n"  or  "ERR <code>\n"
 //   latest                      ->  "OK <timestamp> <value>\n"
 //   list                        ->  "OK <count>\n" + one line per record
@@ -51,6 +52,13 @@ static void uart_send_str(hal_uart_t *uart, const char *str)
 int uart_handler_process(const char *line, leafts_db_t *db, hal_uart_t *uart)
 {
     char response[128];
+
+    //  HELLO (GREETING) 
+    if (strncmp(line, "hello", 5) == 0)
+    {
+        uart_send_str(uart, "OK hello\n");
+        return LEAFTS_OK;
+    }
 
     //  APPEND 
     if (strncmp(line, "append", 6) == 0)

@@ -18,6 +18,7 @@ static void print_record(uint32_t index, const leafts_record_t *record)
 static void print_help(void)
 {
     printf("Commands:\n");
+    printf("  hello                       - Greeting\n");
     printf("  append <timestamp> <value>  - Write new record to flash\n");
     printf("  latest                      - Read latest record\n");
     printf("  list                        - List all records\n");
@@ -54,10 +55,13 @@ int main(void)
         printf("> ");
         if (fgets(command, sizeof(command), stdin) == NULL) break;
 
-        // PARSE AND HANDLE APPEND COMMAND
+        // PARSE AND HANDLE COMMANDS
         uint32_t timestamp;
         float value;
-        if (sscanf(command, "append %u %f", &timestamp, &value) == 2) {
+        if (strncmp(command, "hello", 5) == 0) {
+            printf("Hello! LeafTS is ready.\n\n");
+        // PARSE AND HANDLE APPEND COMMAND
+        } else if (sscanf(command, "append %u %f", &timestamp, &value) == 2) {
             int result = leafts_append(&db, timestamp, value);
             if (result == LEAFTS_OK)
                 printf("[OK] Record appended (count=%u)\n\n", db.record_count);
