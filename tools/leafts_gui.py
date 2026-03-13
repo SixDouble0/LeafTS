@@ -1,5 +1,5 @@
 """
-LeafTS Playground
+LeafTS Application — a GUI tool to explore LeafTS on your embedded board.
 =================
 • Select a board → generate a ready-to-use C project
 • Connect via UART (COM port) or TCP (emulator)
@@ -17,6 +17,7 @@ import subprocess
 import sys
 import threading
 import time
+from datetime import datetime
 from pathlib import Path
 
 import serial
@@ -430,13 +431,15 @@ class SerialBackend(Backend):
 # ---------------------------------------------------------------------------
 DARK_TERM = """
 QTextEdit {
-    background-color: #0d1117;
-    color: #e6edf3;
-    font-family: Consolas, 'Courier New', monospace;
-    font-size: 13px;
-    border: 1px solid #30363d;
-    border-radius: 4px;
-    padding: 6px;
+    background-color: #0a0f14;
+    color: #d8dee9;
+    font-family: 'JetBrains Mono', 'Cascadia Code', 'Fira Code', Consolas, monospace;
+    font-size: 12px;
+    border: 1px solid #1f2a33;
+    border-radius: 8px;
+    padding: 8px;
+    selection-background-color: #2f81f7;
+    selection-color: #f0f6fc;
 }
 """
 SNIPPET_STYLE = """
@@ -551,7 +554,15 @@ QPushButton#connBtn[connected="true"]:hover { background-color: #da3633; }
 
 QPushButton#clearBtn  { color: #484f58; font-size: 11px; padding: 4px 10px; }
 QPushButton#refreshBtn { color: #484f58; font-size: 11px; padding: 4px 8px; max-width: 34px; }
-QPushButton#copyBtn   { color: #484f58; font-size: 11px; padding: 3px 8px; }
+QPushButton#copyBtn {
+    background-color: #1f6feb;
+    border-color: #388bfd;
+    color: #e6edf3;
+    font-size: 11px;
+    padding: 4px 10px;
+    font-weight: bold;
+}
+QPushButton#copyBtn:hover { background-color: #388bfd; }
 
 QTabWidget::pane {
     border: 1px solid #30363d;
@@ -626,7 +637,7 @@ class BoardPanel(QWidget):
         lay.addWidget(sep)
 
         self.search = QLineEdit()
-        self.search.setPlaceholderText("🔍  Search board, MCU, vendor...")
+        self.search.setPlaceholderText("Search board, MCU, vendor...")
         self.search.textChanged.connect(self._filter)
         lay.addWidget(self.search)
 
@@ -667,14 +678,14 @@ class BoardPanel(QWidget):
         self.snippet.setPlaceholderText("← select a board")
         gl2.addWidget(self.snippet)
         copy_row = QHBoxLayout()
-        copy_btn = QPushButton("📋  Copy snippet"); copy_btn.setObjectName("copyBtn")
+        copy_btn = QPushButton("Copy snippet"); copy_btn.setObjectName("copyBtn")
         copy_btn.clicked.connect(self._copy_snippet)
         copy_row.addWidget(copy_btn); copy_row.addStretch()
         gl2.addLayout(copy_row)
         lay.addWidget(grp2)
 
         # Generate button
-        self.gen_btn = QPushButton("📁  Generate C project...")
+        self.gen_btn = QPushButton("Generate C project...")
         self.gen_btn.setObjectName("genBtn")
         self.gen_btn.setEnabled(False)
         self.gen_btn.setToolTip(
@@ -817,12 +828,12 @@ class ConnectionBar(QWidget):
         hint.setStyleSheet("color: #484f58; font-size: 11px;")
         tcp_l.addWidget(hint)
         tcp_l.addStretch()
-        self.tcp_btn = QPushButton("▶  Connect")
+        self.tcp_btn = QPushButton("Connect")
         self.tcp_btn.setObjectName("connBtn")
         self.tcp_btn.setProperty("connected", "false")
         self.tcp_btn.clicked.connect(self._on_tcp_btn)
         tcp_l.addWidget(self.tcp_btn)
-        self.tabs.addTab(tcp_w, "🖥️  TCP (emulator)")
+        self.tabs.addTab(tcp_w, "TCP (emulator)")
 
         # Serial tab
         ser_w  = QWidget()
@@ -833,7 +844,7 @@ class ConnectionBar(QWidget):
         self.ser_port = QComboBox()
         self.ser_port.setMinimumWidth(110)
         ser_l.addWidget(self.ser_port)
-        ref_btn = QPushButton("🔄")
+        ref_btn = QPushButton("↻")
         ref_btn.setObjectName("refreshBtn")
         ref_btn.setToolTip("Refresh COM ports")
         ref_btn.clicked.connect(self._refresh)
@@ -847,12 +858,12 @@ class ConnectionBar(QWidget):
         ser_l.addWidget(self.ser_baud)
         ser_l.addWidget(QLabel("8N1"))
         ser_l.addStretch()
-        self.ser_btn = QPushButton("▶  Connect")
+        self.ser_btn = QPushButton("Connect")
         self.ser_btn.setObjectName("connBtn")
         self.ser_btn.setProperty("connected", "false")
         self.ser_btn.clicked.connect(self._on_ser_btn)
         ser_l.addWidget(self.ser_btn)
-        self.tabs.addTab(ser_w, "🔌  UART (hardware)")
+        self.tabs.addTab(ser_w, "UART (hardware)")
 
         lay.addWidget(self.tabs)
         self._refresh()
@@ -884,8 +895,8 @@ class ConnectionBar(QWidget):
     def set_connected(self, ok: bool):
         self._connected = ok
         val = "true" if ok else "false"
-        lbl_on  = "⏹  Disconnect"
-        lbl_off = "▶  Connect"
+        lbl_on  = "Disconnect"
+        lbl_off = "Connect"
         for btn in (self.tcp_btn, self.ser_btn):
             btn.setProperty("connected", val)
             btn.setText(lbl_on if ok else lbl_off)
@@ -906,7 +917,13 @@ class TerminalPanel(QWidget):
         super().__init__()
         self._history: list[str] = []
         self._hist_idx = -1
+        self._prompt_user = "user"
+        self._prompt_host = "leafts"
         self._build_ui()
+
+    @staticmethod
+    def _clock() -> str:
+        return datetime.now().strftime("%H:%M:%S")
 
     def _build_ui(self):
         lay = QVBoxLayout(self)
@@ -915,10 +932,10 @@ class TerminalPanel(QWidget):
 
         # Header
         hdr = QHBoxLayout()
-        t = QLabel("Terminal  /  LeafTS")
-        t.setStyleSheet("color: #58a6ff; font-size: 14px; font-weight: bold;")
+        t = QLabel("Terminal  /  Neo Shell")
+        t.setStyleSheet("color: #7aa2f7; font-size: 14px; font-weight: bold;")
         hdr.addWidget(t); hdr.addStretch()
-        self.status_lbl = QLabel("⏸  Disconnected")
+        self.status_lbl = QLabel("Disconnected")
         self.status_lbl.setObjectName("statusErr")
         hdr.addWidget(self.status_lbl)
         lay.addLayout(hdr)
@@ -940,16 +957,18 @@ class TerminalPanel(QWidget):
         self.output.setStyleSheet(DARK_TERM)
         self.output.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
         lay.addWidget(self.output, stretch=1)
+        self._render_banner()
 
         # Input row
         inp = QHBoxLayout(); inp.setSpacing(6)
-        self.prompt_lbl = QLabel("leafts>")
+        self.prompt_lbl = QLabel(f"{self._prompt_user}@{self._prompt_host}")
         self.prompt_lbl.setStyleSheet(
-            "color: #3fb950; font-family: Consolas, monospace; "
+            "color: #7ee787; "
+            "font-family: 'JetBrains Mono', 'Cascadia Code', Consolas, monospace; "
             "font-size: 13px; font-weight: bold;")
         inp.addWidget(self.prompt_lbl)
         self.input = QLineEdit()
-        self.input.setPlaceholderText("type command...  (Enter = send  ·  ↑↓ = history)")
+        self.input.setPlaceholderText("run a query... (Enter = send, Up/Down = history)")
         self.input.setFont(QFont("Consolas", 13))
         self.input.returnPressed.connect(self._send)
         self.input.installEventFilter(self)
@@ -962,24 +981,40 @@ class TerminalPanel(QWidget):
         inp.addWidget(clr_btn)
         lay.addLayout(inp)
 
-        hint = QLabel(
-            "insert &lt;val&gt; OR insert &lt;val&gt; &lt;ts&gt;  ·  select  ·  select *  ·  "
-            "select count(*)  ·  select min(value)  ·  select max(value)  ·  select avg(value)  ·  "
-            "select * limit &lt;n&gt;  ·  select * where timestamp between &lt;ts1&gt; &lt;ts2&gt;  ·  "
-            "delete from leafts  ·  truncate table leafts  ·  "
-            "get_last &lt;n&gt;  ·  get_range &lt;ts1&gt; &lt;ts2&gt;  ·  "
-            "get_min  ·  get_max  ·  status  ·  erase  ·  "
-            "get_first  ·  get_avg  ·  count  ·  "
-            "get_by_index &lt;n&gt;  ·  get_avg_range &lt;ts1&gt; &lt;ts2&gt;  ·  "
-            "get_stddev  ·  get_sum  ·  get_count_range &lt;ts1&gt; &lt;ts2&gt;  ·  "
-            "get_nth_last &lt;n&gt;  ·  get_above &lt;val&gt;  ·  get_below &lt;val&gt;  ·  "
-            "get_between &lt;v1&gt; &lt;v2&gt;  ·  get_min_range &lt;ts1&gt; &lt;ts2&gt;  ·  "
-            "get_max_range &lt;ts1&gt; &lt;ts2&gt;  ·  get_latest_n &lt;n&gt;  ·  get_median  ·  "
-            "(aliases: append=list insert, latest/select, list/select *)"
-        )
+        hint = QLabel("Write help to get a list of available commands. This terminal is not a full shell, but it supports basic line editing and command history navigation with Up/Down arrows.")
         hint.setStyleSheet("color: #484f58; font-size: 10px;")
         hint.setWordWrap(True)
         lay.addWidget(hint)
+
+    def _render_banner(self):
+        art = [
+            "                @@@@@@@@@@@@@@@@@@@",
+            "            @@@                   @",
+            "          @@                    @@@            _                 __ _____ ____  ",
+            "         @                      @             | |    ___   __ _ / _|_   _/ ___| ",
+            "       @@                    @@@@             | |   / _ \\ /_ ` | |_  | | \\___ \\ ",
+            "       @             @       @                | |__|  __/ (_|  |  _| | |  ___) | ",
+            "      @@          @@@        @                |_____\\___|\\__,_ |_|   |_| |____/ ",
+            "      @         @@        @@@@",
+            "      @       @@          @                    ULTRA-MINIMAL EMBEDDED DATABASE",
+            "      @@     @@           @",              
+            "       @   @@            @@",
+            "          @@            @@",
+            "         @            @@@",              
+            "        @  @@@@@@@@@@@",
+            "       @",
+            "      @",
+            "     @@",
+            "",
+        ]
+        self.output.setTextColor(QColor("#3fb950"))
+        for line in art:
+            self.output.append(line)
+        self.output.setTextColor(QColor("#9ece6a"))
+        self.output.append(f"[{self._clock()}] Welcome to LeafTS Playground shell")
+        self.output.append("Write help to get a list of available commands.")
+        self.output.setTextColor(QColor("#d8dee9"))
+        self.output.moveCursor(QTextCursor.MoveOperation.End)
 
     def eventFilter(self, obj, ev):
         if obj is self.input and ev.type() == QEvent.Type.KeyPress:
@@ -999,30 +1034,30 @@ class TerminalPanel(QWidget):
         if not self._history or self._history[-1] != cmd:
             self._history.append(cmd)
         self._hist_idx = len(self._history)
-        self.output.setTextColor(QColor("#3fb950"))
-        self.output.append(f"leafts> {cmd}")
-        self.output.setTextColor(QColor("#e6edf3"))
+        self.output.setTextColor(QColor("#7ee787"))
+        self.output.append(f"[{self._clock()}] {self.prompt_lbl.text()} {cmd}")
+        self.output.setTextColor(QColor("#d8dee9"))
         self.input.clear()
         self.command_entered.emit(cmd)
 
     def append_response(self, line: str):
-        color = "#56d364" if line.startswith("OK") else "#f85149" if line.startswith("ERR") else "#a5d6ff"
+        color = "#9ece6a" if line.startswith("OK") else "#f7768e" if line.startswith("ERR") else "#7dcfff"
         self.output.setTextColor(QColor(color))
-        self.output.append(f"  {line}")
-        self.output.setTextColor(QColor("#e6edf3"))
+        self.output.append(f"[{self._clock()}] {line}")
+        self.output.setTextColor(QColor("#d8dee9"))
         self.output.moveCursor(QTextCursor.MoveOperation.End)
 
     def append_system(self, msg: str, color: str = "#d29922"):
         self.output.setTextColor(QColor(color))
-        self.output.append(f"[system]  {msg}")
-        self.output.setTextColor(QColor("#e6edf3"))
+        self.output.append(f"[{self._clock()}] [system] {msg}")
+        self.output.setTextColor(QColor("#d8dee9"))
         self.output.moveCursor(QTextCursor.MoveOperation.End)
 
     def set_status(self, state: str):
-        m = {"ok": ("statusOk", "🟢  Connected"),
-             "err": ("statusErr", "🔴  Disconnected"),
-             "wait": ("statusWait", "⏳  Connecting...")}
-        obj, txt = m.get(state, ("statusErr", "⏸  Disconnected"))
+        m = {"ok": ("statusOk", "Connected"),
+             "err": ("statusErr", "Disconnected"),
+             "wait": ("statusWait", "Connecting...")}
+        obj, txt = m.get(state, ("statusErr", "Disconnected"))
         self.status_lbl.setObjectName(obj)
         self.status_lbl.setText(txt)
         self.status_lbl.style().unpolish(self.status_lbl)
@@ -1030,7 +1065,7 @@ class TerminalPanel(QWidget):
 
     def set_board(self, b: dict):
         self.board_lbl.setText(
-            f"📟  {b['name']}  ·  {b.get('mcu','').upper()}  "
+            f"{b['name']}  ·  {b.get('mcu','').upper()}  "
             f"·  {b['flash_size'] // 1024} KB  ·  {b['family']}"
         )
         self.board_lbl.setStyleSheet("color: #8b949e; font-size: 11px;")
@@ -1044,7 +1079,7 @@ class TerminalPanel(QWidget):
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("LeafTS Playground")
+        self.setWindowTitle("LeafTS Application")
         self.resize(1220, 780)
         self._backend: Backend | None = None
 
@@ -1143,7 +1178,7 @@ def main():
     try:
         app = QApplication(sys.argv)
         app.setStyleSheet(APP_STYLE)
-        app.setApplicationName("LeafTS Playground")
+        app.setApplicationName("LeafTS Application")
         window = MainWindow()
         window.show()
         sys.exit(app.exec())

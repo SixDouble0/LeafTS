@@ -684,6 +684,25 @@ int uart_handler_process(const char *line, leafts_db_t *db, hal_uart_t *uart)
         return LEAFTS_OK;
     }
 
+    //  HELP
+    if (strncmp(line, "help", 4) == 0)
+    {
+        uart_send_str(uart, "OK 12\n");
+        uart_send_str(uart, "insert <value> [timestamp] - add record\n");
+        uart_send_str(uart, "select - latest record\n");
+        uart_send_str(uart, "select * - list all records\n");
+        uart_send_str(uart, "select count(*) - record count\n");
+        uart_send_str(uart, "select min(value) - minimum value\n");
+        uart_send_str(uart, "select max(value) - maximum value\n");
+        uart_send_str(uart, "select avg(value) - average value\n");
+        uart_send_str(uart, "select * limit <n> - last N records\n");
+        uart_send_str(uart, "select * where timestamp between <from> <to> - range query\n");
+        uart_send_str(uart, "status - database info\n");
+        uart_send_str(uart, "erase - remove all records\n");
+        uart_send_str(uart, "help - show this list\n");
+        return LEAFTS_OK;
+    }
+
     //  UNKNOWN COMMAND 
     uart_send_str(uart, "ERR unknown_cmd\n");
     return LEAFTS_ERR_NULL;

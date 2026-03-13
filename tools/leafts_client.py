@@ -90,7 +90,7 @@ def send_command(sock: socket.socket, command: str) -> list[str]:
     cmd_name = normalized.split()[0] if normalized else ""
     is_list_like = (
         cmd_name in ("list", "get_last", "get_range")
-        or normalized in ("select *", "select all")
+        or normalized in ("select *", "select all", "help")
     )
     if first_line.startswith("OK") and is_list_like:
         parts = first_line.split()
@@ -151,6 +151,14 @@ def print_response(command: str, lines: list[str]) -> None:
             rparts = record_line.split()
             if len(rparts) == 2:
                 print(f"  {i:<8} {rparts[0]:<14} {rparts[1]}")
+        return
+
+    if normalized == "help":
+        parts = first.split()
+        count = int(parts[1]) if len(parts) == 2 else 0
+        print("  Available commands:")
+        for line in lines[1:1 + count]:
+            print(f"  - {line}")
         return
 
     # STATUS - PARSE count= capacity=

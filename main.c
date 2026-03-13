@@ -33,16 +33,16 @@ static void print_record(uint32_t index, const leafts_record_t *record)
 static void print_help(void)
 {
     printf("Commands:\n");
-    printf("  insert <value>              - Write new record with auto timestamp (RTC/system)\n");
-    printf("  insert <value> <timestamp>  - Write new record with manual timestamp\n");
-    printf("  select                      - Read latest record (alias: latest)\n");
-    printf("  select *                    - List all records (alias: list)\n");
-    printf("  select count(*)             - Show record count\n");
-    printf("  select * where timestamp between <from> <to> - List records in range\n");
-    printf("  delete from leafts          - Erase database (alias: erase)\n");
-    printf("  erase                       - Erase entire database\n");
-    printf("  status                      - Show DB info\n");
-    printf("  help                        - Show this help\n");
+    printf("  insert <value>              - Add record (auto timestamp)\n");
+    printf("  insert <value> <timestamp>  - Add record (manual timestamp)\n");
+    printf("  select                      - Latest record\n");
+    printf("  select *                    - List all records\n");
+    printf("  select count(*)             - Record count\n");
+    printf("  select * where timestamp between <from> <to> - Range query\n");
+    printf("  delete from leafts          - Remove all records\n");
+    printf("  erase                       - Remove all records\n");
+    printf("  status                      - Database info\n");
+    printf("  help                        - Show this list\n");
     printf("  exit                        - Quit\n\n");
 }
 
