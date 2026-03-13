@@ -43,15 +43,67 @@ def _base_dir() -> Path:
         return Path(sys._MEIPASS)      # type: ignore[attr-defined]
     return Path(__file__).parent.parent
 
+
+def _resolve_server_exe() -> Path:
+    """Resolve the best leafts_uart executable path for current mode."""
+    base = _base_dir()
+    if getattr(sys, "frozen", False):
+        return base / "leafts_uart.exe"
+
+    candidates = [
+        base / "out" / "build" / "virtual" / "leafts_uart.exe",
+        base / "build" / "leafts_uart.exe",
+    ]
+    for candidate in candidates:
+        if candidate.exists():
+            return candidate
+    return candidates[0]
+
+
+def _normalize_wire_command(cmd: str) -> str:
+    """Translate user-friendly SQL-like syntax to wire protocol understood by all server versions."""
+    raw = cmd.strip()
+    if not raw:
+        return raw
+
+    lowered = raw.lower()
+    if lowered in ("select", "select latest"):
+        return "latest"
+    if lowered in ("select *", "select all"):
+        return "list"
+    if lowered == "select count(*)":
+        return "count"
+    if lowered == "select min(value)":
+        return "get_min"
+    if lowered == "select max(value)":
+        return "get_max"
+    if lowered == "select avg(value)":
+        return "get_avg"
+    if lowered in ("delete from leafts", "truncate table leafts"):
+        return "erase"
+
+    ts_range = lowered.split()
+    if len(ts_range) == 7 and ts_range[:5] == ["select", "*", "where", "timestamp", "between"]:
+        return f"get_range {ts_range[5]} {ts_range[6]}"
+
+    sql_limit = lowered.split()
+    if len(sql_limit) == 4 and sql_limit[:3] == ["select", "*", "limit"]:
+        return f"get_last {sql_limit[3]}"
+
+    parts = raw.split()
+    if len(parts) >= 2 and parts[0].lower() in ("insert", "append"):
+        # insert <value> -> append <auto_ts> <value>
+        if len(parts) == 2:
+            return f"append {int(time.time())} {parts[1]}"
+        # insert <value> <timestamp> -> append <timestamp> <value>
+        if len(parts) == 3:
+            return f"append {parts[2]} {parts[1]}"
+
+    return raw
+
 BASE_DIR    = _base_dir()
 BOARDS_JSON = BASE_DIR / "boards" / "boards.json"
-SERVER_EXE  = BASE_DIR / "leafts_uart.exe"   # bundled at root of _MEIPASS
-
-# In dev mode leafts_uart.exe lives in build/
-if not getattr(sys, "frozen", False):
-    _dev_server = Path(__file__).parent.parent / "build" / "leafts_uart.exe"
-    if _dev_server.exists():
-        SERVER_EXE = _dev_server
+SERVER_EXE  = _resolve_server_exe()
 
 TCP_HOST = "127.0.0.1"
 TCP_PORT = 5555
@@ -911,7 +963,10 @@ class TerminalPanel(QWidget):
         lay.addLayout(inp)
 
         hint = QLabel(
-            "append &lt;ts&gt; &lt;val&gt;  ·  latest  ·  list  ·  "
+            "insert &lt;val&gt; OR insert &lt;val&gt; &lt;ts&gt;  ·  select  ·  select *  ·  "
+            "select count(*)  ·  select min(value)  ·  select max(value)  ·  select avg(value)  ·  "
+            "select * limit &lt;n&gt;  ·  select * where timestamp between &lt;ts1&gt; &lt;ts2&gt;  ·  "
+            "delete from leafts  ·  truncate table leafts  ·  "
             "get_last &lt;n&gt;  ·  get_range &lt;ts1&gt; &lt;ts2&gt;  ·  "
             "get_min  ·  get_max  ·  status  ·  erase  ·  "
             "get_first  ·  get_avg  ·  count  ·  "
@@ -919,7 +974,8 @@ class TerminalPanel(QWidget):
             "get_stddev  ·  get_sum  ·  get_count_range &lt;ts1&gt; &lt;ts2&gt;  ·  "
             "get_nth_last &lt;n&gt;  ·  get_above &lt;val&gt;  ·  get_below &lt;val&gt;  ·  "
             "get_between &lt;v1&gt; &lt;v2&gt;  ·  get_min_range &lt;ts1&gt; &lt;ts2&gt;  ·  "
-            "get_max_range &lt;ts1&gt; &lt;ts2&gt;  ·  get_latest_n &lt;n&gt;  ·  get_median"
+            "get_max_range &lt;ts1&gt; &lt;ts2&gt;  ·  get_latest_n &lt;n&gt;  ·  get_median  ·  "
+            "(aliases: append=list insert, latest/select, list/select *)"
         )
         hint.setStyleSheet("color: #484f58; font-size: 10px;")
         hint.setWordWrap(True)
@@ -1072,7 +1128,7 @@ class MainWindow(QMainWindow):
 
     def _send(self, cmd: str):
         if self._backend:
-            self._backend.send(cmd)
+            self._backend.send(_normalize_wire_command(cmd))
         else:
             self.terminal_panel.append_system("Not connected — click ▶ Connect.", "#d29922")
             self.terminal_panel.append_response("ERR not_connected")

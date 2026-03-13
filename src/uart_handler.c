@@ -1,6 +1,7 @@
 #include <math.h>
 #include <stdio.h>
 #include <string.h>
+#include <time.h>
 
 #include "../include/uart_handler.h"
 
@@ -33,13 +34,35 @@ static void uart_send_str(hal_uart_t *uart, const char *str)
     uart->send((const uint8_t *)str, (uint32_t)strlen(str));
 }
 
+static uint32_t auto_timestamp_now(leafts_db_t *db)
+{
+    time_t now = time(NULL);
+    if (now > 0 && (unsigned long long)now <= 0xFFFFFFFFULL)
+        return (uint32_t)now;
+
+    if (db->record_count > 0) {
+        leafts_record_t latest_record;
+        if (leafts_get_latest(db, &latest_record) == LEAFTS_OK)
+            return latest_record.timestamp + 1U;
+    }
+
+    return 1U;
+}
+
 
 
 // PROCESS ONE COMPLETE LINE - DISPATCH TO CORRECT leafts_* FUNCTION
 // PROTOCOL:
-//   append <timestamp> <value>  ->  "OK\n"  or  "ERR <code>\n"
-//   latest                      ->  "OK <timestamp> <value>\n"
-//   list                        ->  "OK <count>\n" + one line per record
+//   insert <value>              ->  "OK\n"  or  "ERR <code>\n" (auto timestamp)
+//   insert <value> <timestamp>  ->  "OK\n"  or  "ERR <code>\n" (manual timestamp)
+//   select / latest             ->  "OK <timestamp> <value>\n"
+//   select * / list             ->  "OK <count>\n" + one line per record
+//   select count(*)             ->  "OK <count>\n" (alias: count)
+//   select min(value)           ->  "OK <timestamp> <value>\n" (alias: get_min)
+//   select max(value)           ->  "OK <timestamp> <value>\n" (alias: get_max)
+//   select avg(value)           ->  "OK <value>\n" (alias: get_avg)
+//   select * limit <n>          ->  "OK <count>\n" + last N lines (alias: get_last)
+//   select * where timestamp between <from> <to> -> range list (alias: get_range)
 //   get_last <n>                ->  "OK <count>\n" + last N lines
 //   get_range <ts_from> <ts_to> ->  "OK <count>\n" + matching lines
 //   get_min                     ->  "OK <timestamp> <value>\n"
@@ -52,18 +75,29 @@ int uart_handler_process(const char *line, leafts_db_t *db, hal_uart_t *uart)
 {
     char response[128];
 
-    //  APPEND 
-    if (strncmp(line, "append", 6) == 0)
+    //  APPEND / INSERT 
+    if (strncmp(line, "append", 6) == 0 || strncmp(line, "insert", 6) == 0)
     {
         uint32_t timestamp;
         float    value;
+        char     extra;
 
-        // PARSE TWO ARGUMENTS FROM LINE
-        if (sscanf(line, "append %lu %f", &timestamp, &value) != 2)
+        int has_manual_ts =
+            (sscanf(line, "append %f %lu %c", &value, &timestamp, &extra) == 2) ||
+            (sscanf(line, "insert %f %lu %c", &value, &timestamp, &extra) == 2);
+
+        int has_auto_ts =
+            (sscanf(line, "append %f %c", &value, &extra) == 1) ||
+            (sscanf(line, "insert %f %c", &value, &extra) == 1);
+
+        if (!has_manual_ts && !has_auto_ts)
         {
             uart_send_str(uart, "ERR bad_args\n");
             return LEAFTS_ERR_NULL;
         }
+
+        if (!has_manual_ts)
+            timestamp = auto_timestamp_now(db);
 
         int result = leafts_append(db, timestamp, value);
 
@@ -80,30 +114,66 @@ int uart_handler_process(const char *line, leafts_db_t *db, hal_uart_t *uart)
         return result;
     }
 
-    //  LATEST 
-    if (strncmp(line, "latest", 6) == 0)
+    //  LIST / SELECT *
+    if (strncmp(line, "list", 4) == 0 ||
+        strncmp(line, "select *", 8) == 0 ||
+        strncmp(line, "select all", 10) == 0)
     {
-        leafts_record_t record;
-        int result = leafts_get_latest(db, &record);
+        uint32_t sql_limit = 0;
+        if (sscanf(line, "select * limit %lu", &sql_limit) == 1) {
+            uint32_t n = sql_limit;
+            if (n > db->record_count) n = db->record_count;
 
-        if (result == LEAFTS_OK)
-        {
-            snprintf(response, sizeof(response),
-                     "OK %lu %f\n", (unsigned long)record.timestamp, record.value);
+            snprintf(response, sizeof(response), "OK %lu\n", (unsigned long)n);
             uart_send_str(uart, response);
+
+            uint32_t start_index = db->record_count - n;
+            for (uint32_t record_index = start_index; record_index < db->record_count; record_index++)
+            {
+                leafts_record_t record;
+                if (leafts_get_by_index(db, record_index, &record) == LEAFTS_OK)
+                {
+                    snprintf(response, sizeof(response),
+                             "%lu %f\n", (unsigned long)record.timestamp, record.value);
+                    uart_send_str(uart, response);
+                }
+            }
+            return LEAFTS_OK;
         }
-        else
-        {
-            snprintf(response, sizeof(response), "ERR %d\n", result);
+
+        uint32_t ts_from_sql = 0;
+        uint32_t ts_to_sql = 0;
+        if (sscanf(line, "select * where timestamp between %lu %lu", &ts_from_sql, &ts_to_sql) == 2) {
+            uint32_t match_count = 0;
+            for (uint32_t record_index = 0; record_index < db->record_count; record_index++)
+            {
+                leafts_record_t record;
+                if (leafts_get_by_index(db, record_index, &record) == LEAFTS_OK)
+                {
+                    if (record.timestamp >= ts_from_sql && record.timestamp <= ts_to_sql)
+                        match_count++;
+                }
+            }
+
+            snprintf(response, sizeof(response), "OK %lu\n", (unsigned long)match_count);
             uart_send_str(uart, response);
+
+            for (uint32_t record_index = 0; record_index < db->record_count; record_index++)
+            {
+                leafts_record_t record;
+                if (leafts_get_by_index(db, record_index, &record) == LEAFTS_OK)
+                {
+                    if (record.timestamp >= ts_from_sql && record.timestamp <= ts_to_sql)
+                    {
+                        snprintf(response, sizeof(response),
+                                 "%lu %f\n", (unsigned long)record.timestamp, record.value);
+                        uart_send_str(uart, response);
+                    }
+                }
+            }
+            return LEAFTS_OK;
         }
 
-        return result;
-    }
-
-    //  LIST 
-    if (strncmp(line, "list", 4) == 0)
-    {
         // SEND COUNT FIRST SO CLIENT KNOWS HOW MANY LINES TO READ
         snprintf(response, sizeof(response), "OK %lu\n", (unsigned long)db->record_count);
         uart_send_str(uart, response);
@@ -121,6 +191,29 @@ int uart_handler_process(const char *line, leafts_db_t *db, hal_uart_t *uart)
         }
 
         return LEAFTS_OK;
+    }
+
+    //  LATEST / SELECT
+    if (strncmp(line, "latest", 6) == 0 ||
+        strcmp(line, "select") == 0 ||
+        strncmp(line, "select latest", 13) == 0)
+    {
+        leafts_record_t record;
+        int result = leafts_get_latest(db, &record);
+
+        if (result == LEAFTS_OK)
+        {
+            snprintf(response, sizeof(response),
+                     "OK %lu %f\n", (unsigned long)record.timestamp, record.value);
+            uart_send_str(uart, response);
+        }
+        else
+        {
+            snprintf(response, sizeof(response), "ERR %d\n", result);
+            uart_send_str(uart, response);
+        }
+
+        return result;
     }
 
     //  GET_LAST 
@@ -159,13 +252,14 @@ int uart_handler_process(const char *line, leafts_db_t *db, hal_uart_t *uart)
     }
 
     //  GET_RANGE 
-    if (strncmp(line, "get_range", 9) == 0)
+    if (strncmp(line, "get_range", 9) == 0 || strncmp(line, "select * where timestamp between", 30) == 0)
     {
         uint32_t ts_from;
         uint32_t ts_to;
 
         // PARSE TIMESTAMP RANGE FROM LINE
-        if (sscanf(line, "get_range %lu %lu", &ts_from, &ts_to) != 2)
+        if (sscanf(line, "get_range %lu %lu", &ts_from, &ts_to) != 2 &&
+            sscanf(line, "select * where timestamp between %lu %lu", &ts_from, &ts_to) != 2)
         {
             uart_send_str(uart, "ERR bad_args\n");
             return LEAFTS_ERR_NULL;
@@ -206,7 +300,7 @@ int uart_handler_process(const char *line, leafts_db_t *db, hal_uart_t *uart)
     }
 
     //  GET_MIN 
-    if (strncmp(line, "get_min", 7) == 0)
+    if (strncmp(line, "get_min", 7) == 0 || strcmp(line, "select min(value)") == 0)
     {
         if (db->record_count == 0)
         {
@@ -235,7 +329,7 @@ int uart_handler_process(const char *line, leafts_db_t *db, hal_uart_t *uart)
     }
 
     //  GET_MAX 
-    if (strncmp(line, "get_max", 7) == 0)
+    if (strncmp(line, "get_max", 7) == 0 || strcmp(line, "select max(value)") == 0)
     {
         if (db->record_count == 0)
         {
@@ -275,7 +369,9 @@ int uart_handler_process(const char *line, leafts_db_t *db, hal_uart_t *uart)
     }
 
     //  ERASE 
-    if (strncmp(line, "erase", 5) == 0)
+    if (strncmp(line, "erase", 5) == 0 ||
+        strcmp(line, "delete from leafts") == 0 ||
+        strcmp(line, "truncate table leafts") == 0)
     {
         int result = leafts_erase(db);
 
@@ -329,7 +425,7 @@ int uart_handler_process(const char *line, leafts_db_t *db, hal_uart_t *uart)
         return LEAFTS_OK;
     }
 
-    if (strncmp(line, "get_avg", 7) == 0)
+    if (strncmp(line, "get_avg", 7) == 0 || strcmp(line, "select avg(value)") == 0)
     {
         if (db->record_count == 0) { uart_send_str(uart, "ERR empty\n"); return LEAFTS_ERR_EMPTY; }
         double sum = 0.0;
@@ -343,7 +439,7 @@ int uart_handler_process(const char *line, leafts_db_t *db, hal_uart_t *uart)
     }
 
     //  COUNT
-    if (strncmp(line, "count", 5) == 0)
+    if (strncmp(line, "count", 5) == 0 || strcmp(line, "select count(*)") == 0)
     {
         snprintf(response, sizeof(response), "OK %lu\n", (unsigned long)db->record_count);
         uart_send_str(uart, response);

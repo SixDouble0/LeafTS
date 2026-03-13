@@ -9,9 +9,10 @@
 //   leafts_init(&db, &flash, 0x08040000, 128 * 1024);
 //
 // Commands (type in the Renode UART Analyzer window):
-//   append <timestamp> <value>   e.g. append 1700000000 23.5
-//   latest
-//   list
+//   insert <value>                e.g. insert 23.5
+//   insert <value> <timestamp>    e.g. insert 23.5 1700000000  (alias: append)
+//   select                        (alias: latest)
+//   select *                      (alias: list)
 //   get_last <n>
 //   get_range <ts_from> <ts_to>
 //   get_min

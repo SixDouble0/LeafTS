@@ -21,9 +21,18 @@ SERVER_EXE  = SCRIPT_DIR / ".." / "build" / "leafts_uart.exe"
 
 HELP_TEXT = """
 Commands:
-  append <timestamp> <value>   append a new record        (e.g. append 1000 21.75)
-  latest                       get the most recent record
-  list                         list all records
+    insert <value>               insert with auto timestamp (RTC/system)
+    insert <value> <timestamp>   insert with manual ts      (alias: append)
+    select                       get the most recent record (alias: latest)
+    select *                     list all records           (alias: list)
+    select count(*)              count records              (alias: count)
+    select min(value)            record with min value      (alias: get_min)
+    select max(value)            record with max value      (alias: get_max)
+    select avg(value)            average value              (alias: get_avg)
+    select * limit <n>           latest N records           (alias: get_last <n>)
+    select * where timestamp between <from> <to>           (alias: get_range <from> <to>)
+    delete from leafts           erase all records          (alias: erase)
+    truncate table leafts        erase all records          (alias: erase)
   get_last <n>                 get last N records          (e.g. get_last 5)
   get_range <from> <to>        get records in ts range     (e.g. get_range 1000 1120)
   get_min                      get record with lowest value
@@ -53,8 +62,6 @@ def start_server() -> subprocess.Popen:
     return proc
 
 
-# ------------------------------------------------------------------ #
-
 
 def connect(host: str, port: int) -> socket.socket:
     """Create TCP connection to leafts_uart server."""
@@ -78,9 +85,14 @@ def send_command(sock: socket.socket, command: str) -> list[str]:
     first_line = read_line(sock)
     lines.append(first_line)
 
-    # LIST / GET_LAST / GET_RANGE - ALL RETURN "OK <count>" THEN <count> EXTRA LINES
-    cmd_name = command.strip().split()[0] if command.strip() else ""
-    if first_line.startswith("OK") and cmd_name in ("list", "get_last", "get_range"):
+    # LIST-LIKE COMMANDS RETURN "OK <count>" THEN <count> EXTRA LINES
+    normalized = command.strip().lower()
+    cmd_name = normalized.split()[0] if normalized else ""
+    is_list_like = (
+        cmd_name in ("list", "get_last", "get_range")
+        or normalized in ("select *", "select all")
+    )
+    if first_line.startswith("OK") and is_list_like:
         parts = first_line.split()
         if len(parts) == 2:
             count = int(parts[1])
@@ -102,9 +114,6 @@ def read_line(sock: socket.socket) -> str:
     return buf.decode().strip()
 
 
-# ------------------------------------------------------------------ #
-
-
 def print_response(command: str, lines: list[str]) -> None:
     """Format and print server response in a readable way."""
 
@@ -118,10 +127,11 @@ def print_response(command: str, lines: list[str]) -> None:
         print(f"  [ERROR] {first}")
         return
 
-    cmd = command.strip().split()[0] if command.strip() else ""
+    normalized = command.strip().lower()
+    cmd = normalized.split()[0] if normalized else ""
 
     # LATEST / GET_MIN / GET_MAX - PARSE timestamp + value
-    if cmd in ("latest", "get_min", "get_max"):
+    if normalized in ("latest", "select", "select latest") or cmd in ("get_min", "get_max"):
         parts = first.split()
         if len(parts) == 3:
             print(f"  timestamp : {parts[1]}")
@@ -129,7 +139,7 @@ def print_response(command: str, lines: list[str]) -> None:
         return
 
     # LIST / GET_LAST / GET_RANGE - PRINT TABLE
-    if cmd in ("list", "get_last", "get_range"):
+    if cmd in ("list", "get_last", "get_range") or normalized in ("select *", "select all"):
         parts = first.split()
         count = int(parts[1]) if len(parts) == 2 else 0
         if count == 0:
