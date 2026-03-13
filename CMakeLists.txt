@@ -15,12 +15,100 @@ set(CMAKE_C_STANDARD_REQUIRED ON)
 # OFF - wyłącza rozszerzenia GNU (używamy czystego ISO C)
 set(CMAKE_C_EXTENSIONS OFF)
 
+# Select runtime HAL backend for application targets.
+# - virtual: host simulation (vflash + vuart)
+# - stm32*/nrf52/rp2040/esp32: board HAL files
+set(LEAFTS_PLATFORM "virtual" CACHE STRING "HAL backend for leafts and leafts_uart targets")
+set_property(CACHE LEAFTS_PLATFORM PROPERTY STRINGS
+    virtual
+    stm32f1 stm32f2 stm32f3 stm32f4 stm32f7
+    stm32g0 stm32g4 stm32h7
+    stm32l1 stm32l4 stm32l5 stm32wb stm32wl
+    nrf52 rp2040 esp32
+)
+
+# STM32F1 requires explicit page size in its init signature.
+set(LEAFTS_STM32F1_PAGE_SIZE 2048 CACHE STRING "STM32F1 flash page size (1024 or 2048)")
+
+if(LEAFTS_PLATFORM STREQUAL "virtual")
+    set(LEAFTS_FLASH_SRC src/hal_vflash.c)
+    set(LEAFTS_UART_SRC  src/hal_vuart.c)
+    set(LEAFTS_PLATFORM_DEF LEAFTS_PLATFORM_VIRTUAL)
+elseif(LEAFTS_PLATFORM STREQUAL "stm32f1")
+    set(LEAFTS_FLASH_SRC src/stm32/hal_stm32f1_flash.c)
+    set(LEAFTS_UART_SRC  src/stm32/hal_stm32f1_uart.c)
+    set(LEAFTS_PLATFORM_DEF LEAFTS_PLATFORM_STM32F1)
+elseif(LEAFTS_PLATFORM STREQUAL "stm32f2")
+    set(LEAFTS_FLASH_SRC src/stm32/hal_stm32f2_flash.c)
+    set(LEAFTS_UART_SRC  src/stm32/hal_stm32f2_uart.c)
+    set(LEAFTS_PLATFORM_DEF LEAFTS_PLATFORM_STM32F2)
+elseif(LEAFTS_PLATFORM STREQUAL "stm32f3")
+    set(LEAFTS_FLASH_SRC src/stm32/hal_stm32f3_flash.c)
+    set(LEAFTS_UART_SRC  src/stm32/hal_stm32f3_uart.c)
+    set(LEAFTS_PLATFORM_DEF LEAFTS_PLATFORM_STM32F3)
+elseif(LEAFTS_PLATFORM STREQUAL "stm32f4")
+    set(LEAFTS_FLASH_SRC src/stm32/hal_stm32f4_flash.c)
+    set(LEAFTS_UART_SRC  src/stm32/hal_stm32f4_uart.c)
+    set(LEAFTS_PLATFORM_DEF LEAFTS_PLATFORM_STM32F4)
+elseif(LEAFTS_PLATFORM STREQUAL "stm32f7")
+    set(LEAFTS_FLASH_SRC src/stm32/hal_stm32f7_flash.c)
+    set(LEAFTS_UART_SRC  src/stm32/hal_stm32f7_uart.c)
+    set(LEAFTS_PLATFORM_DEF LEAFTS_PLATFORM_STM32F7)
+elseif(LEAFTS_PLATFORM STREQUAL "stm32g0")
+    set(LEAFTS_FLASH_SRC src/stm32/hal_stm32g0_flash.c)
+    set(LEAFTS_UART_SRC  src/stm32/hal_stm32g0_uart.c)
+    set(LEAFTS_PLATFORM_DEF LEAFTS_PLATFORM_STM32G0)
+elseif(LEAFTS_PLATFORM STREQUAL "stm32g4")
+    set(LEAFTS_FLASH_SRC src/stm32/hal_stm32g4_flash.c)
+    set(LEAFTS_UART_SRC  src/stm32/hal_stm32g4_uart.c)
+    set(LEAFTS_PLATFORM_DEF LEAFTS_PLATFORM_STM32G4)
+elseif(LEAFTS_PLATFORM STREQUAL "stm32h7")
+    set(LEAFTS_FLASH_SRC src/stm32/hal_stm32h7_flash.c)
+    set(LEAFTS_UART_SRC  src/stm32/hal_stm32h7_uart.c)
+    set(LEAFTS_PLATFORM_DEF LEAFTS_PLATFORM_STM32H7)
+elseif(LEAFTS_PLATFORM STREQUAL "stm32l1")
+    set(LEAFTS_FLASH_SRC src/stm32/hal_stm32l1_flash.c)
+    set(LEAFTS_UART_SRC  src/stm32/hal_stm32l1_uart.c)
+    set(LEAFTS_PLATFORM_DEF LEAFTS_PLATFORM_STM32L1)
+elseif(LEAFTS_PLATFORM STREQUAL "stm32l4")
+    set(LEAFTS_FLASH_SRC src/stm32/hal_stm32l4_flash.c)
+    set(LEAFTS_UART_SRC  src/stm32/hal_stm32l4_uart.c)
+    set(LEAFTS_PLATFORM_DEF LEAFTS_PLATFORM_STM32L4)
+elseif(LEAFTS_PLATFORM STREQUAL "stm32l5")
+    set(LEAFTS_FLASH_SRC src/stm32/hal_stm32l5_flash.c)
+    set(LEAFTS_UART_SRC  src/stm32/hal_stm32l5_uart.c)
+    set(LEAFTS_PLATFORM_DEF LEAFTS_PLATFORM_STM32L5)
+elseif(LEAFTS_PLATFORM STREQUAL "stm32wb")
+    set(LEAFTS_FLASH_SRC src/stm32/hal_stm32wb_flash.c)
+    set(LEAFTS_UART_SRC  src/stm32/hal_stm32wb_uart.c)
+    set(LEAFTS_PLATFORM_DEF LEAFTS_PLATFORM_STM32WB)
+elseif(LEAFTS_PLATFORM STREQUAL "stm32wl")
+    set(LEAFTS_FLASH_SRC src/stm32/hal_stm32wl_flash.c)
+    set(LEAFTS_UART_SRC  src/stm32/hal_stm32wl_uart.c)
+    set(LEAFTS_PLATFORM_DEF LEAFTS_PLATFORM_STM32WL)
+elseif(LEAFTS_PLATFORM STREQUAL "nrf52")
+    set(LEAFTS_FLASH_SRC src/nrf/hal_nrf52_flash.c)
+    set(LEAFTS_UART_SRC  src/nrf/hal_nrf52_uart.c)
+    set(LEAFTS_PLATFORM_DEF LEAFTS_PLATFORM_NRF52)
+elseif(LEAFTS_PLATFORM STREQUAL "rp2040")
+    set(LEAFTS_FLASH_SRC src/rp/hal_rp2040_flash.c)
+    set(LEAFTS_UART_SRC  src/rp/hal_rp2040_uart.c)
+    set(LEAFTS_PLATFORM_DEF LEAFTS_PLATFORM_RP2040)
+elseif(LEAFTS_PLATFORM STREQUAL "esp32")
+    set(LEAFTS_FLASH_SRC src/esp32/hal_esp32_flash.c)
+    set(LEAFTS_UART_SRC  src/esp32/hal_esp32_uart.c)
+    set(LEAFTS_PLATFORM_DEF LEAFTS_PLATFORM_ESP32)
+else()
+    message(FATAL_ERROR "Unknown LEAFTS_PLATFORM='${LEAFTS_PLATFORM}'")
+endif()
+
 # Tworzenie pliku wykonywalnego
 # add_executable(NAZWA_PROGRAMU lista_plików_źródłowych)
 # leafts - nazwa końcowego pliku (leafts.exe na Windows)
 add_executable(leafts
     main.c
-    src/hal_vflash.c
+    src/platform_hal.c
+    ${LEAFTS_FLASH_SRC}
     src/leafts.c
 )
 
@@ -29,6 +117,11 @@ target_include_directories(leafts PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}
     ${CMAKE_CURRENT_SOURCE_DIR}/hal
     ${CMAKE_CURRENT_SOURCE_DIR}/include
+)
+target_compile_definitions(leafts PRIVATE
+    ${LEAFTS_PLATFORM_DEF}
+    LEAFTS_STM32F1_PAGE_SIZE=${LEAFTS_STM32F1_PAGE_SIZE}
+    LEAFTS_NO_UART
 )
 
 # Test executable - Unity framework + CTest
@@ -85,8 +178,9 @@ add_test(NAME HAL_STM32L4_Mock_Tests COMMAND leafts_test_hal_stm32l4_mock)
 # ON REAL MCU: REPLACE hal_vuart.c WITH hal_stm32_uart.c OR hal_esp32_uart.c
 add_executable(leafts_uart
     main_uart.c
-    src/hal_vflash.c
-    src/hal_vuart.c
+    src/platform_hal.c
+    ${LEAFTS_FLASH_SRC}
+    ${LEAFTS_UART_SRC}
     src/leafts.c
     src/uart_handler.c
 )
@@ -95,11 +189,15 @@ target_include_directories(leafts_uart PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/hal
     ${CMAKE_CURRENT_SOURCE_DIR}/include
 )
+target_compile_definitions(leafts_uart PRIVATE
+    ${LEAFTS_PLATFORM_DEF}
+    LEAFTS_STM32F1_PAGE_SIZE=${LEAFTS_STM32F1_PAGE_SIZE}
+)
 # LINK WINSOCK2 ON WINDOWS - REQUIRED FOR TCP SOCKETS
-if(WIN32)
+if(WIN32 AND LEAFTS_PLATFORM STREQUAL "virtual")
     target_link_libraries(leafts_uart PRIVATE ws2_32)
 endif()
-if(UNIX)
+if(UNIX AND LEAFTS_PLATFORM STREQUAL "virtual")
     target_link_libraries(leafts_uart PRIVATE m)
 endif()
 

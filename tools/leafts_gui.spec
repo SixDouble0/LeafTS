@@ -6,6 +6,7 @@
 
 import sys
 from pathlib import Path
+import glob
 
 ROOT = Path(SPECPATH).parent          # project root (one level above tools/)
 
@@ -20,19 +21,28 @@ datas = [
     # backend server
     (str(ROOT / "build"  / "leafts_uart.exe"), "."),
 
-    # library headers & sources (for project generation)
-    (str(ROOT / "include" / "leafts.h"),          "include"),
+    # library headers & core sources (always copied by generator)
+    (str(ROOT / "include" / "leafts.h"),           "include"),
     (str(ROOT / "include" / "uart_handler.h"),     "include"),
-    (str(ROOT / "hal"     / "hal_flash.h"),        "hal"),
-    (str(ROOT / "hal"     / "hal_uart.h"),         "hal"),
-    (str(ROOT / "hal"     / "hal_stm32l4_flash.h"),"hal"),
-    (str(ROOT / "hal"     / "hal_stm32l4_uart.h"), "hal"),
-    (str(ROOT / "hal"     / "hal_vflash.h"),       "hal"),
-    (str(ROOT / "src"     / "leafts.c"),           "src"),
-    (str(ROOT / "src"     / "uart_handler.c"),     "src"),
-    (str(ROOT / "src"     / "hal_stm32l4_flash.c"),"src"),
-    (str(ROOT / "src"     / "hal_stm32l4_uart.c"), "src"),
+    (str(ROOT / "hal" / "hal_flash.h"),            "hal"),
+    (str(ROOT / "hal" / "hal_uart.h"),             "hal"),
+    (str(ROOT / "src" / "leafts.c"),               "src"),
+    (str(ROOT / "src" / "uart_handler.c"),         "src"),
 ]
+
+# Family HAL files used by the project generator.
+# Keep subfolders in bundle (hal/stm32, src/stm32, ...), otherwise GUI reports
+# "HAL not implemented" even when files exist in the repository.
+for rel in (
+    "hal/**/*.h",
+    "src/**/*_flash.c",
+):
+    for file_path in glob.glob(str(ROOT / rel), recursive=True):
+        p = Path(file_path)
+        if not p.is_file():
+            continue
+        bundle_dir = str(p.relative_to(ROOT).parent).replace("\\", "/")
+        datas.append((str(p), bundle_dir))
 
 a = Analysis(
     [str(ROOT / "tools" / "leafts_gui.py")],

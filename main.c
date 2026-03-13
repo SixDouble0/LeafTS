@@ -1,8 +1,7 @@
 #include <stdio.h>
 #include <string.h>
-#include "hal/hal_flash.h"
-#include "hal/hal_vflash.h"
 #include "include/leafts.h"
+#include "include/platform_hal.h"
 
 #define DB_BASE_ADDR  0x00000000U
 #define DB_SIZE       (4U * 1024U)   // 4KB reserved for LeafTS records
@@ -30,9 +29,9 @@ int main(void)
 {
     printf("LeafTS - Embedded Time-Series Database\n\n");
 
-    // INITIALIZE VIRTUAL FLASH HAL
+    // Initialize selected platform flash HAL (virtual by default).
     hal_flash_t hal;
-    if (vflash_init(&hal) != 0) {
+    if (platform_flash_init(&hal, DB_BASE_ADDR, DB_SIZE) != 0) {
         printf("ERROR: Flash init failed!\n");
         return 1;
     }

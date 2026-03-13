@@ -1,9 +1,10 @@
 #include <stdio.h>
 #include <stdint.h>
 
-#include "hal/hal_vflash.h"
-#include "hal/hal_vuart.h"
+#include "hal/hal_flash.h"
+#include "hal/hal_uart.h"
 #include "include/leafts.h"
+#include "include/platform_hal.h"
 #include "include/uart_handler.h"
 
 // FLASH REGION RESERVED FOR LeafTS DATABASE
@@ -19,8 +20,12 @@ int main(void)
     hal_uart_t  uart;
     leafts_db_t db;
 
-    // INITIALIZE VIRTUAL FLASH - 64KB RAM ARRAY SIMULATING FLASH
-    vflash_init(&flash);
+    // Initialize selected platform flash HAL (virtual by default).
+    if (platform_flash_init(&flash, DB_BASE_ADDR, DB_SIZE) != 0)
+    {
+        printf("[leafts] ERROR: flash init failed\n");
+        return 1;
+    }
 
     // INITIALIZE DATABASE - SCAN FLASH AND RESTORE RECORD COUNT
     leafts_init(&db, &flash, DB_BASE_ADDR, DB_SIZE);
@@ -29,8 +34,12 @@ int main(void)
            (unsigned long)db.record_count,
            (unsigned long)db.capacity);
 
-    // INITIALIZE VIRTUAL UART - BLOCKS UNTIL PYTHON CLIENT CONNECTS
-    vuart_init(&uart, VUART_PORT);
+    // Initialize selected platform UART HAL (virtual by default).
+    if (platform_uart_init(&uart, VUART_PORT) != 0)
+    {
+        printf("[leafts] ERROR: uart init failed\n");
+        return 1;
+    }
 
     // MAIN LOOP - READ ONE LINE AT A TIME AND PROCESS AS COMMAND
     printf("[leafts] Ready. Waiting for commands...\n");

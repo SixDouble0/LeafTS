@@ -13,11 +13,19 @@ echo.
 :: 1. Upewnij sie ze leafts_uart.exe jest zbudowany
 if not exist "build\leafts_uart.exe" (
     echo [INFO] Budowanie leafts_uart.exe...
-    cmake -S . -B build -G "MinGW Makefiles" 2>nul
+    if not exist "build" mkdir build
+    cmake --preset virtual 2>nul
     if errorlevel 1 (
-        cmake -S . -B build 2>nul
+        cmake -S . -B build -G "MinGW Makefiles" 2>nul
+        if errorlevel 1 (
+            cmake -S . -B build 2>nul
+        )
     )
-    cmake --build build --target leafts_uart
+    if exist "out\build\virtual\leafts_uart.exe" (
+        copy /Y "out\build\virtual\leafts_uart.exe" "build\leafts_uart.exe" >nul
+    ) else (
+        cmake --build build --target leafts_uart
+    )
     if errorlevel 1 (
         echo [ERROR] Nie udalo sie zbudowac leafts_uart.exe
         echo         Zbuduj recznie: cmake --build build --target leafts_uart
