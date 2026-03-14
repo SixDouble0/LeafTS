@@ -24,7 +24,7 @@
 #include <stdint.h>
 
 #include "hal/hal_vflash.h"
-#include "hal/hal_stm32l4_uart.h"
+#include "hal/stm32/hal_stm32l4_uart.h"
 #include "include/leafts.h"
 #include "include/uart_handler.h"
 

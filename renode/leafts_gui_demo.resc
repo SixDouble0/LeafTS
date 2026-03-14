@@ -1,0 +1,16 @@
+using sysbus
+
+mach create "LeafTS_UART"
+machine LoadPlatformDescription @C:/Projects/LeafTS/renode/stm32l476.repl
+
+# Replace the standard showAnalyzer with UART2 exposed on a TCP socket (port 5555)
+# The false flag disables Telnet negotiation sequences (so the GUI receives pure bytes)
+emulation CreateServerSocketTerminal 5555 "term" false
+connector Connect sysbus.usart2 term
+
+macro reset
+"""
+    sysbus LoadELF @C:/Projects/LeafTS/renode/leafts_uart_demo.elf
+"""
+runMacro $reset
+start
