@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <time.h>
 #include "include/leafts.h"
@@ -29,6 +30,146 @@ static void print_record(uint32_t index, const leafts_record_t *record)
            index, record->timestamp, record->value, record->crc);
 }
 
+static int erase_n_smallest_records(leafts_db_t *db, uint32_t n, uint32_t *removed_out)
+{
+    if (!db || !removed_out) return LEAFTS_ERR_NULL;
+    if (db->record_count == 0) return LEAFTS_ERR_EMPTY;
+    if (n == 0) return LEAFTS_ERR_NULL;
+
+    uint32_t total = db->record_count;
+    if (n >= total) {
+        int r = leafts_erase(db);
+        if (r == LEAFTS_OK) *removed_out = total;
+        return r;
+    }
+
+    leafts_record_t *records = (leafts_record_t *)malloc((size_t)total * sizeof(leafts_record_t));
+    uint8_t *remove_mask = (uint8_t *)calloc(total, sizeof(uint8_t));
+    if (!records || !remove_mask) {
+        free(records);
+        free(remove_mask);
+        return LEAFTS_ERR_NULL;
+    }
+
+    for (uint32_t i = 0; i < total; i++) {
+        if (leafts_get_by_index(db, i, &records[i]) != LEAFTS_OK) {
+            free(records);
+            free(remove_mask);
+            return LEAFTS_ERR_HAL;
+        }
+    }
+
+    for (uint32_t k = 0; k < n; k++) {
+        uint32_t min_idx = total;
+        float min_val = 0.0f;
+        for (uint32_t i = 0; i < total; i++) {
+            if (remove_mask[i]) continue;
+            if (min_idx == total || records[i].value < min_val) {
+                min_idx = i;
+                min_val = records[i].value;
+            }
+        }
+        if (min_idx == total) break;
+        remove_mask[min_idx] = 1U;
+    }
+
+    int r = leafts_erase(db);
+    if (r != LEAFTS_OK) {
+        free(records);
+        free(remove_mask);
+        return r;
+    }
+
+    uint32_t removed = 0;
+    for (uint32_t i = 0; i < total; i++) {
+        if (remove_mask[i]) {
+            removed++;
+            continue;
+        }
+        r = leafts_append(db, records[i].timestamp, records[i].value);
+        if (r != LEAFTS_OK) {
+            free(records);
+            free(remove_mask);
+            return r;
+        }
+    }
+
+    free(records);
+    free(remove_mask);
+    *removed_out = removed;
+    return LEAFTS_OK;
+}
+
+static int erase_n_largest_records(leafts_db_t *db, uint32_t n, uint32_t *removed_out)
+{
+    if (!db || !removed_out) return LEAFTS_ERR_NULL;
+    if (db->record_count == 0) return LEAFTS_ERR_EMPTY;
+    if (n == 0) return LEAFTS_ERR_NULL;
+
+    uint32_t total = db->record_count;
+    if (n >= total) {
+        int r = leafts_erase(db);
+        if (r == LEAFTS_OK) *removed_out = total;
+        return r;
+    }
+
+    leafts_record_t *records = (leafts_record_t *)malloc((size_t)total * sizeof(leafts_record_t));
+    uint8_t *remove_mask = (uint8_t *)calloc(total, sizeof(uint8_t));
+    if (!records || !remove_mask) {
+        free(records);
+        free(remove_mask);
+        return LEAFTS_ERR_NULL;
+    }
+
+    for (uint32_t i = 0; i < total; i++) {
+        if (leafts_get_by_index(db, i, &records[i]) != LEAFTS_OK) {
+            free(records);
+            free(remove_mask);
+            return LEAFTS_ERR_HAL;
+        }
+    }
+
+    for (uint32_t k = 0; k < n; k++) {
+        uint32_t max_idx = total;
+        float max_val = 0.0f;
+        for (uint32_t i = 0; i < total; i++) {
+            if (remove_mask[i]) continue;
+            if (max_idx == total || records[i].value > max_val) {
+                max_idx = i;
+                max_val = records[i].value;
+            }
+        }
+        if (max_idx == total) break;
+        remove_mask[max_idx] = 1U;
+    }
+
+    int r = leafts_erase(db);
+    if (r != LEAFTS_OK) {
+        free(records);
+        free(remove_mask);
+        return r;
+    }
+
+    uint32_t removed = 0;
+    for (uint32_t i = 0; i < total; i++) {
+        if (remove_mask[i]) {
+            removed++;
+            continue;
+        }
+        r = leafts_append(db, records[i].timestamp, records[i].value);
+        if (r != LEAFTS_OK) {
+            free(records);
+            free(remove_mask);
+            return r;
+        }
+    }
+
+    free(records);
+    free(remove_mask);
+    *removed_out = removed;
+    return LEAFTS_OK;
+}
+
 // PRINT AVAILABLE COMMANDS
 static void print_help(void)
 {
@@ -40,7 +181,14 @@ static void print_help(void)
     printf("  select count(*)             - Record count\n");
     printf("  select * where timestamp between <from> <to> - Range query\n");
     printf("  delete from leafts          - Remove all records\n");
+    printf("  delete min(value)           - Remove smallest record\n");
+    printf("  delete max(value)           - Remove largest record\n");
+    printf("  delete from leafts order by value asc limit <n> - Remove N smallest values\n");
+    printf("  delete from leafts order by value desc limit <n> - Remove N largest values\n");
+    printf("  erase min <n>               - Remove N smallest values\n");
+    printf("  erase max <n>               - Remove N largest values\n");
     printf("  erase                       - Remove all records\n");
+    printf("  clear                       - Clear terminal output\n");
     printf("  status                      - Database info\n");
     printf("  help                        - Show this list\n");
     printf("  exit                        - Quit\n\n");
@@ -156,6 +304,35 @@ int main(void)
         } else if (strncmp(command, "select count(*)", 15) == 0) {
             printf("  count = %u\n\n", db.record_count);
 
+        // PARSE AND HANDLE DELETE N SMALLEST COMMAND
+        } else if (sscanf(command, "erase min %u", &timestamp) == 1 ||
+                   sscanf(command, "delete from leafts order by value asc limit %u", &timestamp) == 1) {
+            uint32_t removed = 0;
+            int result = erase_n_smallest_records(&db, timestamp, &removed);
+            if (result == LEAFTS_OK)
+                printf("[OK] Removed %u smallest records (count=%u)\n\n", removed, db.record_count);
+            else if (result == LEAFTS_ERR_EMPTY)
+                printf("[EMPTY] No records in database\n\n");
+            else
+                printf("[ERROR] Delete failed (code=%d)\n\n", result);
+
+        // PARSE AND HANDLE DELETE LARGEST COMMAND
+        } else if (sscanf(command, "erase max %u", &timestamp) == 1 ||
+                   sscanf(command, "delete from leafts order by value desc limit %u", &timestamp) == 1 ||
+                   strcmp(command, "delete max(value)\n") == 0 ||
+                   strcmp(command, "delete max(value)") == 0) {
+            uint32_t n = timestamp;
+            if (strcmp(command, "delete max(value)\n") == 0 || strcmp(command, "delete max(value)") == 0)
+                n = 1;
+            uint32_t removed = 0;
+            int result = erase_n_largest_records(&db, n, &removed);
+            if (result == LEAFTS_OK)
+                printf("[OK] Removed %u largest records (count=%u)\n\n", removed, db.record_count);
+            else if (result == LEAFTS_ERR_EMPTY)
+                printf("[EMPTY] No records in database\n\n");
+            else
+                printf("[ERROR] Delete failed (code=%d)\n\n", result);
+
         // PARSE AND HANDLE ERASE COMMAND
         } else if (strncmp(command, "erase", 5) == 0 ||
                    strncmp(command, "delete from leafts", 18) == 0 ||
@@ -164,6 +341,10 @@ int main(void)
                 printf("[OK] Database erased (count=%u)\n\n", db.record_count);
             else
                 printf("[ERROR] HAL erase failed\n\n");
+
+        // PARSE AND HANDLE CLEAR COMMAND
+        } else if (strncmp(command, "clear", 5) == 0) {
+            printf("\033[2J\033[H");
 
         // PARSE AND HANDLE STATUS COMMAND
         } else if (strncmp(command, "status", 6) == 0) {

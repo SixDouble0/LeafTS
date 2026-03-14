@@ -21,25 +21,34 @@ SERVER_EXE  = SCRIPT_DIR / ".." / "build" / "leafts_uart.exe"
 
 HELP_TEXT = """
 Commands:
-    insert <value>               insert with auto timestamp (RTC/system)
-    insert <value> <timestamp>   insert with manual ts      (alias: append)
-    select                       get the most recent record (alias: latest)
-    select *                     list all records           (alias: list)
-    select count(*)              count records              (alias: count)
-    select min(value)            record with min value      (alias: get_min)
-    select max(value)            record with max value      (alias: get_max)
-    select avg(value)            average value              (alias: get_avg)
-    select * limit <n>           latest N records           (alias: get_last <n>)
-    select * where timestamp between <from> <to>           (alias: get_range <from> <to>)
-    delete from leafts           erase all records          (alias: erase)
-    truncate table leafts        erase all records          (alias: erase)
+        insert <value> [timestamp|date]    add record
+            date format: dd.mm.yyyy[.hh[.mm[.ss]]]
+        select                             latest record
+        select min|max|avg|count           aggregate over all records
+        select limit <n>                   last N records
+        select limit <n> max|min|avg|count aggregate over last N
+        select ts(<from>,<to>)             records in ts/date range
+        select ts(<from>,<to>) limit <n> [max|min|avg|count]
+        delete * | delete all              remove all records
+        delete min [n] / delete min(n)     remove smallest record(s)
+        delete max [n] / delete max(n)     remove largest record(s)
+        delete value(<v>)                  remove records with exact value
+        delete ts(<from>,<to>)             remove records in ts/date range
+        delete * limit <n> max|min         remove extreme from last N
+        erase                              hard clear (all records)
+        clear                              clear terminal output
+        help                               show this message
+
+SQL aliases (still supported):
+        select * ...
+        select * where timestamp between ...
+        delete from leafts ...
+        truncate table leafts
   get_last <n>                 get last N records          (e.g. get_last 5)
   get_range <from> <to>        get records in ts range     (e.g. get_range 1000 1120)
   get_min                      get record with lowest value
   get_max                      get record with highest value
   status                       show record count and capacity
-  erase                        erase all records from flash
-  help                         show this message
   exit                         disconnect and quit
 """
 
@@ -88,9 +97,17 @@ def send_command(sock: socket.socket, command: str) -> list[str]:
     # LIST-LIKE COMMANDS RETURN "OK <count>" THEN <count> EXTRA LINES
     normalized = command.strip().lower()
     cmd_name = normalized.split()[0] if normalized else ""
+    select_has_agg = (
+        normalized in ("select min", "select max", "select avg", "select count")
+        or normalized.endswith(" max")
+        or normalized.endswith(" min")
+        or normalized.endswith(" avg")
+        or normalized.endswith(" count")
+    )
     is_list_like = (
         cmd_name in ("list", "get_last", "get_range")
         or normalized in ("select *", "select all", "help")
+        or ((normalized.startswith("select limit ") or normalized.startswith("select ts(") or normalized.startswith("select *")) and not select_has_agg)
     )
     if first_line.startswith("OK") and is_list_like:
         parts = first_line.split()
@@ -131,7 +148,7 @@ def print_response(command: str, lines: list[str]) -> None:
     cmd = normalized.split()[0] if normalized else ""
 
     # LATEST / GET_MIN / GET_MAX - PARSE timestamp + value
-    if normalized in ("latest", "select", "select latest") or cmd in ("get_min", "get_max"):
+    if normalized in ("latest", "select", "select latest", "select min", "select max") or cmd in ("get_min", "get_max"):
         parts = first.split()
         if len(parts) == 3:
             print(f"  timestamp : {parts[1]}")
@@ -139,7 +156,7 @@ def print_response(command: str, lines: list[str]) -> None:
         return
 
     # LIST / GET_LAST / GET_RANGE - PRINT TABLE
-    if cmd in ("list", "get_last", "get_range") or normalized in ("select *", "select all"):
+    if cmd in ("list", "get_last", "get_range") or normalized in ("select *", "select all") or normalized.startswith("select limit ") or normalized.startswith("select ts("):
         parts = first.split()
         count = int(parts[1]) if len(parts) == 2 else 0
         if count == 0:
@@ -167,6 +184,14 @@ def print_response(command: str, lines: list[str]) -> None:
         for part in parts:
             key, _, val = part.partition("=")
             print(f"  {key:<12}: {val}")
+        return
+
+    if normalized in ("select count", "select count(*)"):
+        payload = first.replace("OK", "").strip()
+        if payload.startswith("count="):
+            print(f"  count      : {payload.split('=', 1)[1]}")
+        else:
+            print(f"  count      : {payload}")
         return
 
     # DEFAULT - JUST PRINT OK

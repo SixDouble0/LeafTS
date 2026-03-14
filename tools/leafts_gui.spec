@@ -1,8 +1,8 @@
 # -*- mode: python ; coding: utf-8 -*-
 #
-# PyInstaller spec for LeafTS Playground
+# PyInstaller spec for LeafTS Studio
 # Run:  pyinstaller tools/leafts_gui.spec
-# Output: dist/LeafTS_Playground.exe  (single portable file)
+# Output: dist/LeafTS_Studio.exe  (single portable file)
 
 import sys
 from pathlib import Path
@@ -70,7 +70,7 @@ exe = EXE(
     a.binaries,
     a.datas,
     [],
-    name="LeafTS_Playground",
+    name="LeafTS_Studio",
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,

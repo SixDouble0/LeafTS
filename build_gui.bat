@@ -1,31 +1,35 @@
 @echo off
 :: ============================================================
-:: build_gui.bat — buduje LeafTS_Playground.exe
+:: build_gui.bat — buduje LeafTS_Studio.exe
 :: Uruchom z katalogu glownego projektu:   build_gui.bat
 :: ============================================================
 
 echo.
 echo ===================================================
-echo  LeafTS Playground — budowanie .exe
+echo  LeafTS Studio — budowanie .exe
 echo ===================================================
 echo.
 
-:: 1. Upewnij sie ze leafts_uart.exe jest zbudowany
-if not exist "build\leafts_uart.exe" (
-    echo [INFO] Budowanie leafts_uart.exe...
-    if not exist "build" mkdir build
-    cmake --preset virtual 2>nul
+:: 1. Zawsze odswiez leafts_uart.exe (unikamy starego backendu w paczce)
+echo [INFO] Budowanie/odswiezanie leafts_uart.exe...
+if not exist "build" mkdir build
+cmake --preset virtual 2>nul
+if errorlevel 1 (
+    cmake -S . -B build -G "MinGW Makefiles" 2>nul
     if errorlevel 1 (
-        cmake -S . -B build -G "MinGW Makefiles" 2>nul
-        if errorlevel 1 (
-            cmake -S . -B build 2>nul
-        )
+        cmake -S . -B build 2>nul
     )
-    if exist "out\build\virtual\leafts_uart.exe" (
-        copy /Y "out\build\virtual\leafts_uart.exe" "build\leafts_uart.exe" >nul
-    ) else (
-        cmake --build build --target leafts_uart
+)
+if exist "out\build\virtual\leafts_uart.exe" (
+    cmake --build out\build\virtual --target leafts_uart
+    if errorlevel 1 (
+        echo [ERROR] Nie udalo sie zbudowac leafts_uart.exe (preset virtual)
+        pause
+        exit /b 1
     )
+    copy /Y "out\build\virtual\leafts_uart.exe" "build\leafts_uart.exe" >nul
+) else (
+    cmake --build build --target leafts_uart
     if errorlevel 1 (
         echo [ERROR] Nie udalo sie zbudowac leafts_uart.exe
         echo         Zbuduj recznie: cmake --build build --target leafts_uart
@@ -54,7 +58,7 @@ if errorlevel 1 (
 
 :: 3. Buduj exe
 echo.
-echo [INFO] Budowanie LeafTS_Playground.exe ...
+echo [INFO] Budowanie LeafTS_Studio.exe ...
 echo        (moze zajac 1-2 minuty)
 echo.
 python -m PyInstaller --clean --workpath pyinstaller_build --distpath dist tools\leafts_gui.spec
@@ -69,7 +73,7 @@ if errorlevel 1 (
 echo.
 echo ===================================================
 echo  SUKCES!
-echo  Plik: dist\LeafTS_Playground.exe  (~36 MB, dziala bez instalacji Pythona)
+echo  Plik: dist\LeafTS_Studio.exe  (~36 MB, dziala bez instalacji Pythona)
 echo  Skopiuj go gdziekolwiek — nie wymaga instalacji.
 echo ===================================================
 echo.
