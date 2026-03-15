@@ -1,0 +1,36 @@
+name: Package LeafTS Library Releases
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch: # Allows manual trigger from GitHub Actions tab
+
+jobs:
+  build_release_packages:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+          
+      - name: Generate Release Zips
+        run: python tools/pack_releases.py
+        
+      - name: Upload to Release
+        uses: softprops/action-gh-release@v2
+        if: github.event_name == 'release'
+        with:
+          files: dist_releases/*.zip
+          
+      # If triggered manually (workflow_dispatch) via Actions tab without a release, upload as artifact to check it works
+      - name: Upload Artifacts (Manual Run)
+        uses: actions/upload-artifact@v4
+        if: github.event_name == 'workflow_dispatch'
+        with:
+          name: leafts-packages
+          path: dist_releases/*.zip
