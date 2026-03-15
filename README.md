@@ -1,5 +1,7 @@
 # LeafTS 🌱
 
+![LeafTS Banner](LeafTsBanner-Reversed-removebg-preview.png)
+
 A lightweight, high-performance Time-Series Database (TSDB) and command-line engine designed specifically for microcontrollers and bare-metal embedded systems.
 
 ## What is LeafTS?
