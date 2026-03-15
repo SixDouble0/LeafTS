@@ -2,12 +2,12 @@
 
 A lightweight, high-performance Time-Series Database (TSDB) and command-line engine designed specifically for microcontrollers and bare-metal embedded systems.
 
-## 🚀 What is LeafTS?
+## What is LeafTS?
 LeafTS allows you to store, query, and analyze time-stamped telemetry data (like sensor readings) directly on the edge device. It features an interactive, SQL-like querying system accessible via UART, making data extraction and debugging incredibly simple. 
 
-Whether you are building environmental monitors, industrial trackers, or IoT nodes, LeafTS handles the flash storage and retrieval logic for you.
+Whether you are building environmental monitors, industrial trackers, or IoT nodes, LeafTS can handle the flash storage and make your life easier.
 
-## ✨ Features
+## Features
 - **No OS Required**: 100% written in standard C, zero dependencies on external OS/RTOS.
 - **Cross-Platform HAL**: Ready-to-use plug-and-play ports for **STM32 (F1-H7, G0-G4, L1-L5, WB/WL), ESP32, nRF52,** and **RP2040**.
 - **SQL-like UART Interface**: Query your device directly with human-readable commands (e.g., `select ts(...,...) limit 10 avg`).
@@ -17,7 +17,7 @@ Whether you are building environmental monitors, industrial trackers, or IoT nod
 
 ---
 
-## 📦 Installation
+## Installation
 
 The easiest way to add LeafTS to your project is via the **Releases** tab on GitHub!
 
@@ -29,7 +29,7 @@ The easiest way to add LeafTS to your project is via the **Releases** tab on Git
 
 ---
 
-## 🛠️ Usage & Configuration
+## Usage & Configuration
 
 ### 1. Initializing the Database in C
 It's incredibly simple to set up in your embedded `main.c`. Include the header and initialize the database with your hardware's specific Flash and UART drivers:
@@ -72,11 +72,12 @@ Connect via a Serial Terminal (like PuTTY or the built-in GUI) and type:
 - `insert K` - Saves a short text flag/string to the database.
 - `list` or `select *` - Prints out all recorded data.
 - `status` - Displays flash memory usage and total record count.
-- `get_latest_n 5` - Returns the last 5 records.
+- `help` - To display all avalibe commands.
+
 
 ---
 
-## 🔧 Developing & Testing Locally
+## Developing & Testing Locally
 
 LeafTS includes a robust testing environment so you can develop logic without flashing the hardware:
 - **Build the native TCP emulator (Windows/Linux)**: 
@@ -85,7 +86,7 @@ LeafTS includes a robust testing environment so you can develop logic without fl
   cmake ..
   cmake --build .
   ```
-- **Run Renode Simulation**: The project contains `.resc` scripts to simulate STM32 targets completely in software using [Renode](https://renode.io/).
+- **Run Renode Simulation**: The project contains `.resc` scripts to simulate STM32 targets completely in software using [Renode](https://renode.io/) which I used to test every family of microcontrolers.
 
-## 📄 License
+## License
 This project is licensed under the MIT License.
