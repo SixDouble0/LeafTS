@@ -434,7 +434,8 @@ int uart_handler_process(const char *line, leafts_db_t *db, hal_uart_t *uart)
         }
 
         if (parsed == 0) {
-            uart_send_str(uart, "ERR bad_args\n");
+            snprintf(response, sizeof(response), "ERR bad_args (parsed=%d, p1=\"%s\", p2=\"%s\")\n", parsed, val_token, ts_token);
+            uart_send_str(uart, response);
             return LEAFTS_ERR_NULL;
         }
 
@@ -442,7 +443,7 @@ int uart_handler_process(const char *line, leafts_db_t *db, hal_uart_t *uart)
         if (sscanf(val_token, "%f%c", &value, &extra_f) != 1) {
             is_text = 1;
             strncpy(text_val, val_token, 4);
-            text_val[4] = ' ';
+            text_val[4] = '\0';
         }
 
         int has_manual_ts = (parsed == 2);
