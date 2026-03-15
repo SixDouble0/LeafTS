@@ -484,8 +484,13 @@ int uart_handler_process(const char *line, leafts_db_t *db, hal_uart_t *uart)
 
             if (leafts_get_by_index(db, record_index, &record) == LEAFTS_OK)
             {
-                snprintf(response, sizeof(response),
-                         "%lu %f\n", (unsigned long)record.timestamp, record.value);
+                if (record.magic == LEAFTS_MAGIC_TEXT) {
+                    snprintf(response, sizeof(response),
+                             "%lu %.4s\n", (unsigned long)record.timestamp, record.text);
+                } else {
+                    snprintf(response, sizeof(response),
+                             "%lu %f\n", (unsigned long)record.timestamp, record.value);
+                }
                 uart_send_str(uart, response);
             }
         }
@@ -696,8 +701,13 @@ int uart_handler_process(const char *line, leafts_db_t *db, hal_uart_t *uart)
             leafts_record_t record;
             if (leafts_get_by_index(db, record_index, &record) == LEAFTS_OK)
             {
-                snprintf(response, sizeof(response),
-                         "%lu %f\n", (unsigned long)record.timestamp, record.value);
+                if (record.magic == LEAFTS_MAGIC_TEXT) {
+                    snprintf(response, sizeof(response),
+                             "%lu %.4s\n", (unsigned long)record.timestamp, record.text);
+                } else {
+                    snprintf(response, sizeof(response),
+                             "%lu %f\n", (unsigned long)record.timestamp, record.value);
+                }
                 uart_send_str(uart, response);
             }
         }
