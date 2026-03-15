@@ -1,8 +1,7 @@
 ![LeafTS Banner](LeafTsBanner-Reversed-removebg-preview.png)
 
-A lightweight, high-performance Time-Series Database (TSDB) and command-line engine designed specifically for microcontrollers and bare-metal embedded systems.
-
 ## What is LeafTS?
+A lightweight, high-performance Time-Series Database (TSDB) and command-line engine designed specifically for microcontrollers and bare-metal embedded systems.
 LeafTS allows you to store, query, and analyze time-stamped telemetry data (like sensor readings) directly on the edge device. It features an interactive, SQL-like querying system accessible via UART, making data extraction and debugging incredibly simple. 
 
 Whether you are building environmental monitors, industrial trackers, or IoT nodes, LeafTS can handle the flash storage and make your life easier.
