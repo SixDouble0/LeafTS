@@ -6,7 +6,9 @@
 #include "../hal/hal_flash.h"
 
 // Magic number to identify valid LeafTS flash storage (for integrity checks)
-#define LEAFTS_MAGIC 0x4C54U  // "LT" in ASCII :)
+#define LEAFTS_MAGIC_FLOAT 0x4C54U  // "LT" in ASCII :)
+#define LEAFTS_MAGIC_TEXT  0x5458U  // "TX" in ASCII
+#define LEAFTS_MAGIC       LEAFTS_MAGIC_FLOAT
 
 // ERROR CODES
 #define LEAFTS_OK 0
@@ -23,11 +25,12 @@
 typedef struct __attribute__((packed)) {
     uint16_t magic;      // Magic number for integrity check
     uint32_t timestamp;  // Timestamp of the data point (e.g., Unix time)
-    float value;         // Sensor reading or data value
+    union {
+       float value;      // Sensor reading (float)
+       char text[4];     // Text value (up to 4 chars long)
+    };
     uint16_t crc;        // CRC16 checksum for integrity verification
-} leafts_record_t; // 12 bytes total (2 (magic) + 4(timestamp) + 4(value) + 2(crc))
-
-// DATA BASE STRUCTURE 
+} leafts_record_t; // 12 bytes total (2 (magic) + 4(timestamp) + 4(payload) + 2(crc))
 typedef struct {
     hal_flash_t* flash;    // Pointer to the flash HAL interface
     uint32_t base_address; // First address in flash where LeafTS data is stored
@@ -41,6 +44,8 @@ typedef struct {
 int leafts_init(leafts_db_t *db,   hal_flash_t *hal,     uint32_t base_addr,        uint32_t size);
 //                Pointer to struct, Timestamp of data point, Value of data point
 int leafts_append(leafts_db_t *db,   uint32_t timestamp,      float value);
+//                Pointer to struct, Timestamp of data point, Text (max 4 chars)
+int leafts_append_text(leafts_db_t *db, uint32_t timestamp,   const char *text);
 //                    Pointer to struct, Pointer to record struct for output
 int leafts_get_latest(leafts_db_t *db,   leafts_record_t *out);
 //                       Pointer to struct, Index of the record to retrieve, Pointer to record struct for output

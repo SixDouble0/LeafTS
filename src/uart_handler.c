@@ -417,27 +417,35 @@ int uart_handler_process(const char *line, leafts_db_t *db, hal_uart_t *uart)
 {
     char response[128];
 
-    //  APPEND / INSERT 
+    //  APPEND / INSERT
     if (strncmp(line, "append", 6) == 0 || strncmp(line, "insert", 6) == 0)
     {
-        uint32_t timestamp;
-        float    value;
+        uint32_t timestamp = 0;
+        float    value = 0.0f;
+        int      is_text = 0;
+        char     text_val[5] = {0};
+        char     val_token[64] = {0};
+        char     ts_token[64] = {0};
         char     extra;
-        char     ts_token[64];
+        
+        int parsed = sscanf(line, "append %63s %63s %c", val_token, ts_token, &extra);
+        if (parsed < 1) {
+            parsed = sscanf(line, "insert %63s %63s %c", val_token, ts_token, &extra);
+        }
 
-        int has_manual_ts =
-            (sscanf(line, "append %f %63s %c", &value, ts_token, &extra) == 2) ||
-            (sscanf(line, "insert %f %63s %c", &value, ts_token, &extra) == 2);
-
-        int has_auto_ts =
-            (sscanf(line, "append %f %c", &value, &extra) == 1) ||
-            (sscanf(line, "insert %f %c", &value, &extra) == 1);
-
-        if (!has_manual_ts && !has_auto_ts)
-        {
+        if (parsed == 0) {
             uart_send_str(uart, "ERR bad_args\n");
             return LEAFTS_ERR_NULL;
         }
+
+        char extra_f;
+        if (sscanf(val_token, "%f%c", &value, &extra_f) != 1) {
+            is_text = 1;
+            strncpy(text_val, val_token, 4);
+            text_val[4] = ' ';
+        }
+
+        int has_manual_ts = (parsed == 2);
 
         if (has_manual_ts) {
             if (!parse_timestamp_token(ts_token, &timestamp)) {
@@ -448,18 +456,19 @@ int uart_handler_process(const char *line, leafts_db_t *db, hal_uart_t *uart)
             timestamp = auto_timestamp_now(db);
         }
 
-        int result = leafts_append(db, timestamp, value);
-
-        if (result == LEAFTS_OK)
-        {
-            uart_send_str(uart, "OK\n");
+        int result;
+        if (is_text) {
+            result = leafts_append_text(db, timestamp, text_val);
+        } else {
+            result = leafts_append(db, timestamp, value);
         }
-        else
-        {
+
+        if (result == LEAFTS_OK) {
+            uart_send_str(uart, "OK\n");
+        } else {
             snprintf(response, sizeof(response), "ERR %d\n", result);
             uart_send_str(uart, response);
         }
-
         return result;
     }
 
