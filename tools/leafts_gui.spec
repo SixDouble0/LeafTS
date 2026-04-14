@@ -36,6 +36,7 @@ datas = [
 for rel in (
     "hal/**/*.h",
     "src/**/*_flash.c",
+    "src/**/*_uart.c",
 ):
     for file_path in glob.glob(str(ROOT / rel), recursive=True):
         p = Path(file_path)

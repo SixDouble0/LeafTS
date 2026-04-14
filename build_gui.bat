@@ -1,17 +1,17 @@
 @echo off
 :: ============================================================
-:: build_gui.bat — buduje LeafTS_Studio.exe
-:: Uruchom z katalogu glownego projektu:   build_gui.bat
+:: build_gui.bat — builds LeafTS_Studio.exe
+:: Run from the project root directory:   build_gui.bat
 :: ============================================================
 
 echo.
 echo ===================================================
-echo  LeafTS Studio — budowanie .exe
+echo  LeafTS Studio — building .exe
 echo ===================================================
 echo.
 
-:: 1. Zawsze odswiez leafts_uart.exe (unikamy starego backendu w paczce)
-echo [INFO] Budowanie/odswiezanie leafts_uart.exe...
+:: 1. Always refresh leafts_uart.exe (avoid stale backend in package)
+echo [INFO] Building/refreshing leafts_uart.exe...
 if not exist "build" mkdir build
 cmake --preset virtual 2>nul
 if errorlevel 1 (
@@ -23,7 +23,7 @@ if errorlevel 1 (
 if exist "out\build\virtual\leafts_uart.exe" (
     cmake --build out\build\virtual --target leafts_uart
     if errorlevel 1 (
-        echo [ERROR] Nie udalo sie zbudowac leafts_uart.exe (preset virtual)
+        echo [ERROR] Failed to build leafts_uart.exe (preset virtual)
         pause
         exit /b 1
     )
@@ -31,50 +31,50 @@ if exist "out\build\virtual\leafts_uart.exe" (
 ) else (
     cmake --build build --target leafts_uart
     if errorlevel 1 (
-        echo [ERROR] Nie udalo sie zbudowac leafts_uart.exe
-        echo         Zbuduj recznie: cmake --build build --target leafts_uart
+        echo [ERROR] Failed to build leafts_uart.exe
+        echo         Build manually: cmake --build build --target leafts_uart
         pause
         exit /b 1
     )
 )
-echo [OK] leafts_uart.exe gotowy
+echo [OK] leafts_uart.exe ready
 
-:: 2. Zainstaluj wymagane pakiety Python jesli brak
-python -c "import PyQt6" 2>nul
+:: 2. Install required Python packages if missing
+py -c "import PyQt6" 2>nul
 if errorlevel 1 (
-    echo [INFO] Instalowanie PyQt6...
+    echo [INFO] Installing PyQt6...
     pip install PyQt6
 )
-python -c "import serial" 2>nul
+py -c "import serial" 2>nul
 if errorlevel 1 (
-    echo [INFO] Instalowanie pyserial...
+    echo [INFO] Installing pyserial...
     pip install pyserial
 )
-python -c "import PyInstaller" 2>nul
+py -c "import PyInstaller" 2>nul
 if errorlevel 1 (
-    echo [INFO] Instalowanie PyInstaller...
+    echo [INFO] Installing PyInstaller...
     pip install pyinstaller
 )
 
-:: 3. Buduj exe
+:: 3. Build exe
 echo.
-echo [INFO] Budowanie LeafTS_Studio.exe ...
-echo        (moze zajac 1-2 minuty)
+echo [INFO] Building LeafTS_Studio.exe ...
+echo        (this may take 1-2 minutes)
 echo.
-python -m PyInstaller --clean --workpath pyinstaller_build --distpath dist tools\leafts_gui.spec
+py -m PyInstaller --clean --workpath pyinstaller_build --distpath dist tools\leafts_gui.spec
 
 if errorlevel 1 (
     echo.
-    echo [ERROR] Budowanie nie powiodlo sie. Sprawdz bledy powyzej.
+    echo [ERROR] Build failed. Check errors above.
     pause
     exit /b 1
 )
 
 echo.
 echo ===================================================
-echo  SUKCES!
-echo  Plik: dist\LeafTS_Studio.exe  (~36 MB, dziala bez instalacji Pythona)
-echo  Skopiuj go gdziekolwiek — nie wymaga instalacji.
+echo  SUCCESS!
+echo  File: dist\LeafTS_Studio.exe  (~36 MB, no Python required)
+echo  Copy it anywhere — no installation needed.
 echo ===================================================
 echo.
 pause

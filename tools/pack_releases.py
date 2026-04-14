@@ -20,34 +20,7 @@ CORE_FILES = [
     "hal/hal_vuart.h",
 ]
 
-STUDIO_FILES = [
-    "tools/leafts_gui.py",
-    "tools/boards.json",
-    "tools/renode_serial_bridge.py",
-    "tools/build_gui.bat",
-    "tools/start_renode.bat",
-    "tools/start_renode_gui.bat",
-    "pyinstaller_build/leafts_gui.exe",
-    "pyinstaller_build/leafts_gui_linux",
-]
-
-# Add all .py files in tools/
-for f in glob.glob("tools/*.py"):
-    if f not in STUDIO_FILES:
-        STUDIO_FILES.append(f)
-
-# Add all .resc files in tools/
-for f in glob.glob("tools/*.resc"):
-    STUDIO_FILES.append(f)
-
-# Add all .bat files in tools/
-for f in glob.glob("tools/*.bat"):
-    if f not in STUDIO_FILES:
-        STUDIO_FILES.append(f)
-
-# Add all .sh files in tools/
-for f in glob.glob("tools/*.sh"):
-    STUDIO_FILES.append(f)
+STUDIO_EXE = "dist/LeafTS_Studio.exe"
 
 def ensure_dist_dir():
     if os.path.exists(DIST_DIR):
@@ -95,8 +68,14 @@ def main():
         
         create_zip(f"LeafTS-{board.upper()}.zip", board_files)
 
-    # Studio package
-    create_zip("LeafTS-Studio.zip", STUDIO_FILES)
+    # Studio package — portable exe, users just extract and run
+    studio_zip = os.path.join(DIST_DIR, "LeafTS-Studio.zip")
+    if os.path.exists(STUDIO_EXE):
+        with zipfile.ZipFile(studio_zip, 'w', zipfile.ZIP_DEFLATED) as zipf:
+            zipf.write(STUDIO_EXE, "LeafTS_Studio.exe")
+        print("Created LeafTS-Studio.zip with LeafTS_Studio.exe")
+    else:
+        print(f"Warning: {STUDIO_EXE} not found — run build_gui.bat first to build the exe")
 
 if __name__ == "__main__":
     print("Starting packaging process...")
