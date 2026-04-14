@@ -20,6 +20,35 @@ CORE_FILES = [
     "hal/hal_vuart.h",
 ]
 
+STUDIO_FILES = [
+    "tools/leafts_gui.py",
+    "tools/boards.json",
+    "tools/renode_serial_bridge.py",
+    "tools/build_gui.bat",
+    "tools/start_renode.bat",
+    "tools/start_renode_gui.bat",
+    "pyinstaller_build/leafts_gui.exe",
+    "pyinstaller_build/leafts_gui_linux",
+]
+
+# Add all .py files in tools/
+for f in glob.glob("tools/*.py"):
+    if f not in STUDIO_FILES:
+        STUDIO_FILES.append(f)
+
+# Add all .resc files in tools/
+for f in glob.glob("tools/*.resc"):
+    STUDIO_FILES.append(f)
+
+# Add all .bat files in tools/
+for f in glob.glob("tools/*.bat"):
+    if f not in STUDIO_FILES:
+        STUDIO_FILES.append(f)
+
+# Add all .sh files in tools/
+for f in glob.glob("tools/*.sh"):
+    STUDIO_FILES.append(f)
+
 def ensure_dist_dir():
     if os.path.exists(DIST_DIR):
         shutil.rmtree(DIST_DIR)
@@ -65,6 +94,9 @@ def main():
         board_files.append(f"src/{group}/hal_{board}_uart.c")
         
         create_zip(f"LeafTS-{board.upper()}.zip", board_files)
+
+    # Studio package
+    create_zip("LeafTS-Studio.zip", STUDIO_FILES)
 
 if __name__ == "__main__":
     print("Starting packaging process...")

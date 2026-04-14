@@ -110,25 +110,25 @@ TCP_PORT = 5555
 # Board → HAL metadata
 # ---------------------------------------------------------------------------
 FAMILY_META: dict[str, dict] = {
-    "STM32L4": {"fn": "stm32l4_flash_init", "h": "stm32/hal_stm32l4_flash.h", "c": "stm32/hal_stm32l4_flash.c"},
-    "STM32F1": {"fn": "stm32f1_flash_init", "h": "stm32/hal_stm32f1_flash.h", "c": "stm32/hal_stm32f1_flash.c"},
-    "STM32F2": {"fn": "stm32f2_flash_init", "h": "stm32/hal_stm32f2_flash.h", "c": "stm32/hal_stm32f2_flash.c"},
-    "STM32F3": {"fn": "stm32f3_flash_init", "h": "stm32/hal_stm32f3_flash.h", "c": "stm32/hal_stm32f3_flash.c"},
-    "STM32F4": {"fn": "stm32f4_flash_init", "h": "stm32/hal_stm32f4_flash.h", "c": "stm32/hal_stm32f4_flash.c"},
-    "STM32F7": {"fn": "stm32f7_flash_init", "h": "stm32/hal_stm32f7_flash.h", "c": "stm32/hal_stm32f7_flash.c"},
-    "STM32H7": {"fn": "stm32h7_flash_init", "h": "stm32/hal_stm32h7_flash.h", "c": "stm32/hal_stm32h7_flash.c"},
-    "STM32G0": {"fn": "stm32g0_flash_init", "h": "stm32/hal_stm32g0_flash.h", "c": "stm32/hal_stm32g0_flash.c"},
-    "STM32G4": {"fn": "stm32g4_flash_init", "h": "stm32/hal_stm32g4_flash.h", "c": "stm32/hal_stm32g4_flash.c"},
-    "STM32L1": {"fn": "stm32l1_flash_init", "h": "stm32/hal_stm32l1_flash.h", "c": "stm32/hal_stm32l1_flash.c"},
-    "STM32L5": {"fn": "stm32l5_flash_init", "h": "stm32/hal_stm32l5_flash.h", "c": "stm32/hal_stm32l5_flash.c"},
-    "STM32WB": {"fn": "stm32wb_flash_init", "h": "stm32/hal_stm32wb_flash.h", "c": "stm32/hal_stm32wb_flash.c"},
-    "STM32WL": {"fn": "stm32wl_flash_init", "h": "stm32/hal_stm32wl_flash.h", "c": "stm32/hal_stm32wl_flash.c"},
-    "nRF52":   {"fn": "nrf52_flash_init",   "h": "nrf/hal_nrf52_flash.h",     "c": "nrf/hal_nrf52_flash.c"},
-    "RP2040":  {"fn": "rp2040_flash_init",  "h": "rp/hal_rp2040_flash.h",      "c": "rp/hal_rp2040_flash.c"},
-    "RP2350":  {"fn": "rp2040_flash_init",  "h": "rp/hal_rp2040_flash.h",      "c": "rp/hal_rp2040_flash.c"},
-    "ESP32":   {"fn": "esp32_flash_init",   "h": "esp32/hal_esp32_flash.h",    "c": "esp32/hal_esp32_flash.c"},
-    "ATSAMD":  {"fn": "samd_flash_init",    "h": "hal_samd_flash.h",   "c": "hal_samd_flash.c"},
-    "AVR":     {"fn": "avr_flash_init",     "h": "hal_avr_flash.h",    "c": "hal_avr_flash.c"},
+    "STM32L4": {"fn": "stm32l4_flash_init", "h": "stm32/hal_stm32l4_flash.h", "c": "stm32/hal_stm32l4_flash.c", "uart_fn": "stm32l4_uart_init", "uart_h": "stm32/hal_stm32l4_uart.h", "uart_c": "stm32/hal_stm32l4_uart.c"},
+    "STM32F1": {"fn": "stm32f1_flash_init", "h": "stm32/hal_stm32f1_flash.h", "c": "stm32/hal_stm32f1_flash.c", "uart_fn": "stm32f1_uart_init", "uart_h": "stm32/hal_stm32f1_uart.h", "uart_c": "stm32/hal_stm32f1_uart.c"},
+    "STM32F2": {"fn": "stm32f2_flash_init", "h": "stm32/hal_stm32f2_flash.h", "c": "stm32/hal_stm32f2_flash.c", "uart_fn": "stm32f2_uart_init", "uart_h": "stm32/hal_stm32f2_uart.h", "uart_c": "stm32/hal_stm32f2_uart.c"},
+    "STM32F3": {"fn": "stm32f3_flash_init", "h": "stm32/hal_stm32f3_flash.h", "c": "stm32/hal_stm32f3_flash.c", "uart_fn": "stm32f3_uart_init", "uart_h": "stm32/hal_stm32f3_uart.h", "uart_c": "stm32/hal_stm32f3_uart.c"},
+    "STM32F4": {"fn": "stm32f4_flash_init", "h": "stm32/hal_stm32f4_flash.h", "c": "stm32/hal_stm32f4_flash.c", "uart_fn": "stm32f4_uart_init", "uart_h": "stm32/hal_stm32f4_uart.h", "uart_c": "stm32/hal_stm32f4_uart.c"},
+    "STM32F7": {"fn": "stm32f7_flash_init", "h": "stm32/hal_stm32f7_flash.h", "c": "stm32/hal_stm32f7_flash.c", "uart_fn": "stm32f7_uart_init", "uart_h": "stm32/hal_stm32f7_uart.h", "uart_c": "stm32/hal_stm32f7_uart.c"},
+    "STM32H7": {"fn": "stm32h7_flash_init", "h": "stm32/hal_stm32h7_flash.h", "c": "stm32/hal_stm32h7_flash.c", "uart_fn": "stm32h7_uart_init", "uart_h": "stm32/hal_stm32h7_uart.h", "uart_c": "stm32/hal_stm32h7_uart.c"},
+    "STM32G0": {"fn": "stm32g0_flash_init", "h": "stm32/hal_stm32g0_flash.h", "c": "stm32/hal_stm32g0_flash.c", "uart_fn": "stm32g0_uart_init", "uart_h": "stm32/hal_stm32g0_uart.h", "uart_c": "stm32/hal_stm32g0_uart.c"},
+    "STM32G4": {"fn": "stm32g4_flash_init", "h": "stm32/hal_stm32g4_flash.h", "c": "stm32/hal_stm32g4_flash.c", "uart_fn": "stm32g4_uart_init", "uart_h": "stm32/hal_stm32g4_uart.h", "uart_c": "stm32/hal_stm32g4_uart.c"},
+    "STM32L1": {"fn": "stm32l1_flash_init", "h": "stm32/hal_stm32l1_flash.h", "c": "stm32/hal_stm32l1_flash.c", "uart_fn": "stm32l1_uart_init", "uart_h": "stm32/hal_stm32l1_uart.h", "uart_c": "stm32/hal_stm32l1_uart.c"},
+    "STM32L5": {"fn": "stm32l5_flash_init", "h": "stm32/hal_stm32l5_flash.h", "c": "stm32/hal_stm32l5_flash.c", "uart_fn": "stm32l5_uart_init", "uart_h": "stm32/hal_stm32l5_uart.h", "uart_c": "stm32/hal_stm32l5_uart.c"},
+    "STM32WB": {"fn": "stm32wb_flash_init", "h": "stm32/hal_stm32wb_flash.h", "c": "stm32/hal_stm32wb_flash.c", "uart_fn": "stm32wb_uart_init", "uart_h": "stm32/hal_stm32wb_uart.h", "uart_c": "stm32/hal_stm32wb_uart.c"},
+    "STM32WL": {"fn": "stm32wl_flash_init", "h": "stm32/hal_stm32wl_flash.h", "c": "stm32/hal_stm32wl_flash.c", "uart_fn": "stm32wl_uart_init", "uart_h": "stm32/hal_stm32wl_uart.h", "uart_c": "stm32/hal_stm32wl_uart.c"},
+    "nRF52":   {"fn": "nrf52_flash_init",   "h": "nrf/hal_nrf52_flash.h",     "c": "nrf/hal_nrf52_flash.c",     "uart_fn": "nrf52_uart_init",   "uart_h": "nrf/hal_nrf52_uart.h",     "uart_c": "nrf/hal_nrf52_uart.c"},
+    "RP2040":  {"fn": "rp2040_flash_init",  "h": "rp/hal_rp2040_flash.h",     "c": "rp/hal_rp2040_flash.c",    "uart_fn": "rp2040_uart_init",  "uart_h": "rp/hal_rp2040_uart.h",     "uart_c": "rp/hal_rp2040_uart.c"},
+    "RP2350":  {"fn": "rp2040_flash_init",  "h": "rp/hal_rp2040_flash.h",     "c": "rp/hal_rp2040_flash.c",    "uart_fn": "rp2040_uart_init",  "uart_h": "rp/hal_rp2040_uart.h",     "uart_c": "rp/hal_rp2040_uart.c"},
+    "ESP32":   {"fn": "esp32_flash_init",   "h": "esp32/hal_esp32_flash.h",   "c": "esp32/hal_esp32_flash.c",  "uart_fn": "esp32_uart_init",   "uart_h": "esp32/hal_esp32_uart.h",   "uart_c": "esp32/hal_esp32_uart.c"},
+    "ATSAMD":  {"fn": "samd_flash_init",    "h": "hal_samd_flash.h",          "c": "hal_samd_flash.c"},
+    "AVR":     {"fn": "avr_flash_init",     "h": "hal_avr_flash.h",           "c": "hal_avr_flash.c"},
 }
 
 # Files always included in a generated project
@@ -150,9 +150,11 @@ def _flash_region(b: dict) -> tuple[int, int]:
     size = b.get("flash_size", 65536)
     if base != 0:
         return base, size
-    # NOR-style (ESP32, RP2040 etc.) — reserve first 512 KB for firmware
-    db_base = 0x80000
-    db_size = max(size - 0x80000, b.get("page_size", 256) * 4)
+    # NOR-style (ESP32, RP2040 etc.) — reserve first 1 MB for firmware + default partitions
+    # ESP-IDF default partition table: factory app at 0x10000, length 0x100000 (1 MB)
+    # LeafTS data starts after firmware at 0x110000
+    db_base = 0x110000
+    db_size = max(size - 0x110000, b.get("page_size", 256) * 4)
     return db_base, db_size
 
 
@@ -173,6 +175,24 @@ def make_main_c(b: dict) -> str:
     meta     = FAMILY_META.get(b["family"], {"fn": "hal_flash_init", "h": "hal_flash.h", "c": ""})
     db_base, db_size = _flash_region(b)
     flash_kb = b["flash_size"] // 1024
+    uart_fn  = meta.get("uart_fn")
+    uart_h   = meta.get("uart_h")
+    # ESP-IDF requires app_main() instead of main()
+    entry_fn = "app_main" if b["family"] == "ESP32" else "main"
+
+    if uart_fn and uart_h:
+        uart_include = f'#include "hal/{uart_h}"\n'
+        uart_init    = f'    {uart_fn}(&uart);\n'
+    else:
+        uart_include = (
+            f'// TODO: include your UART HAL header here, e.g.:\n'
+            f'// #include "hal/hal_<family>_uart.h"\n'
+        )
+        uart_init = (
+            f'    // TODO: call your UART init here, e.g.:\n'
+            f'    // <family>_uart_init(&uart);\n'
+        )
+
     return (
         f'// Generated by LeafTS Studio\n'
         f'// Board  : {b["name"]}\n'
@@ -184,36 +204,24 @@ def make_main_c(b: dict) -> str:
         f'//\n'
         f'// HOW TO USE:\n'
         f'//   1. Add hal/, include/, src/ to your build system.\n'
-        f'//   2. Implement board_uart_init() for your hardware.\n'
-        f'//   3. Compile and flash.\n'
+        f'//   2. Compile and flash.\n'
         f'\n'
         f'#include <stdint.h>\n'
         f'#include <string.h>\n'
         f'#include "hal/{meta["h"]}"\n'
-        f'#include "hal/hal_uart.h"\n'
+        f'{uart_include}'
         f'#include "include/leafts.h"\n'
         f'#include "include/uart_handler.h"\n'
-        f'\n'
-        f'// ── Implement UART init for your board ────────────────────────────────────────\n'
-        f'// Example STM32L4:\n'
-        f'//   #include "hal/hal_stm32l4_uart.h"\n'
-        f'//   stm32l4_uart_init(&uart);\n'
-        f'static void board_uart_init(hal_uart_t *uart)\n'
-        f'{{\n'
-        f'    (void)uart;\n'
-        f'    // TODO: initialise hardware UART here\n'
-        f'}}\n'
-        f'// ─────────────────────────────────────────────────────────────────────────────\n'
         f'\n'
         f'static hal_flash_t flash;\n'
         f'static hal_uart_t  uart;\n'
         f'static leafts_db_t db;\n'
         f'\n'
-        f'int main(void)\n'
+        f'{"void" if entry_fn == "app_main" else "int"} {entry_fn}(void)\n'
         f'{{\n'
         f'    {meta["fn"]}(&flash, 0x{db_base:08X}UL, {db_size}U);\n'
         f'    leafts_init(&db, &flash, 0x{db_base:08X}UL, {db_size}U);\n'
-        f'    board_uart_init(&uart);\n'
+        f'{uart_init}'
         f'\n'
         f'    char    line[128];\n'
         f'    uint8_t ch;\n'
@@ -244,6 +252,72 @@ def make_main_c(b: dict) -> str:
     )
 
 
+def make_build_files(b: dict) -> dict[str, str]:
+    """Return {relative_path: content} for build system files appropriate for this family."""
+    family  = b["family"]
+    name    = Path(b["name"]).name.replace(" ", "_")  # safe project name
+    meta    = FAMILY_META.get(family, {})
+    srcs    = [
+        "../main.c",
+        "../src/leafts.c",
+        "../src/uart_handler.c",
+        f'../src/{meta["c"]}' if meta.get("c") else None,
+        f'../src/{meta["uart_c"]}' if meta.get("uart_c") else None,
+    ]
+    srcs = [s for s in srcs if s]
+    srcs_str = "\n        ".join(srcs)
+
+    if family == "ESP32":
+        top = (
+            f'cmake_minimum_required(VERSION 3.16)\n'
+            f'include($ENV{{IDF_PATH}}/tools/cmake/project.cmake)\n'
+            f'project({name})\n'
+        )
+        main_comp = (
+            f'idf_component_register(\n'
+            f'    SRCS\n'
+            f'        {srcs_str}\n'
+            f'    INCLUDE_DIRS\n'
+            f'        "../include"\n'
+            f'        "../hal"\n'
+            f')\n'
+        )
+        return {
+            "CMakeLists.txt":      top,
+            "main/CMakeLists.txt": main_comp,
+        }
+
+    if family in ("RP2040", "RP2350"):
+        top = (
+            f'cmake_minimum_required(VERSION 3.13)\n'
+            f'include($ENV{{PICO_SDK_PATH}}/external/pico_sdk_import.cmake)\n'
+            f'project({name} C CXX ASM)\n'
+            f'pico_sdk_init()\n\n'
+            f'add_executable({name}\n'
+            f'    {srcs_str.replace("../", "")}\n'
+            f')\n'
+            f'target_include_directories({name} PRIVATE include hal)\n'
+            f'pico_add_extra_outputs({name})\n'
+        )
+        return {"CMakeLists.txt": top}
+
+    if family.startswith("STM32") or family == "nRF52":
+        srcs_mk = " \\\n    ".join(srcs)
+        makefile = (
+            f'# LeafTS project — {b["name"]}\n'
+            f'# Add this to your STM32CubeIDE / Keil / IAR project,\n'
+            f'# or adapt to your own Makefile toolchain.\n\n'
+            f'SRCS = \\\n'
+            f'    {srcs_mk}\n\n'
+            f'INCLUDES = \\\n'
+            f'    -Iinclude \\\n'
+            f'    -Ihal\n'
+        )
+        return {"leafts.mk": makefile}
+
+    return {}
+
+
 def generate_project(b: dict, dest: Path) -> list[str]:
     """Copy all needed files to dest. Returns list of relative paths (or '[MISSING] ...')."""
     meta   = FAMILY_META.get(b["family"], {"fn": "hal_flash_init", "h": "hal_flash.h", "c": ""})
@@ -266,8 +340,19 @@ def generate_project(b: dict, dest: Path) -> list[str]:
     if meta["c"]:
         cp(f'src/{meta["c"]}', f'src/{meta["c"]}')
 
+    if meta.get("uart_h"):
+        cp(f'hal/{meta["uart_h"]}', f'hal/{meta["uart_h"]}')
+    if meta.get("uart_c"):
+        cp(f'src/{meta["uart_c"]}', f'src/{meta["uart_c"]}')
+
     (dest / "main.c").write_text(make_main_c(b), encoding="utf-8")
     copied.append("main.c  ← generated")
+
+    for rel_path, content in make_build_files(b).items():
+        out = dest / rel_path
+        out.parent.mkdir(parents=True, exist_ok=True)
+        out.write_text(content, encoding="utf-8")
+        copied.append(f"{rel_path}  ← generated")
 
     return copied
 

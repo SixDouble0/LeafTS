@@ -415,7 +415,7 @@ static int erase_extreme_from_last_n(leafts_db_t *db, uint32_t n, int pick_max, 
 
 int uart_handler_process(const char *line, leafts_db_t *db, hal_uart_t *uart)
 {
-    char response[128];
+    char response[256];
 
     //  APPEND / INSERT
     if (strncmp(line, "append", 6) == 0 || strncmp(line, "insert", 6) == 0)
