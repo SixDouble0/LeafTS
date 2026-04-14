@@ -1,36 +1,71 @@
-name: Package LeafTS Library Releases
+name: Build & Package LeafTS Releases
 
 on:
   release:
     types: [published]
-  workflow_dispatch: # Allows manual trigger from GitHub Actions tab
+  workflow_dispatch:
 
 jobs:
-  build_release_packages:
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write
-    
+  # ── Job 1: Build LeafTS_Studio.exe on Windows ────────────────────────────
+  build-studio:
+    runs-on: windows-latest
     steps:
-      - name: Checkout Code
+      - name: Checkout
         uses: actions/checkout@v4
-      
+
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.x'
-          
-      - name: Generate Release Zips
+
+      - name: Install Python dependencies
+        run: pip install PyQt6 pyserial pyinstaller
+
+      - name: Configure & build leafts_uart.exe (virtual backend)
+        run: |
+          cmake -S . -B build -G "MinGW Makefiles" -DPLATFORM=VIRTUAL
+          cmake --build build --target leafts_uart
+
+      - name: Build LeafTS_Studio.exe
+        run: python -m PyInstaller --clean --workpath pyinstaller_build --distpath dist tools/leafts_gui.spec
+
+      - name: Upload exe artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: LeafTS_Studio_exe
+          path: dist/LeafTS_Studio.exe
+
+  # ── Job 2: Package all release zips ──────────────────────────────────────
+  package-releases:
+    runs-on: ubuntu-latest
+    needs: build-studio
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
+      - name: Download Studio exe
+        uses: actions/download-artifact@v4
+        with:
+          name: LeafTS_Studio_exe
+          path: dist
+
+      - name: Generate all release zips
         run: python tools/pack_releases.py
-        
+
       - name: Upload to Release
         uses: softprops/action-gh-release@v2
         if: github.event_name == 'release'
         with:
           files: dist_releases/*.zip
-          
-      # If triggered manually (workflow_dispatch) via Actions tab without a release, upload as artifact to check it works
-      - name: Upload Artifacts (Manual Run)
+
+      - name: Upload artifacts (manual run)
         uses: actions/upload-artifact@v4
         if: github.event_name == 'workflow_dispatch'
         with:
