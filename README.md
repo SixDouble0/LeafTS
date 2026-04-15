@@ -87,6 +87,13 @@ LeafTS includes a robust testing environment so you can develop logic without fl
   ```
 - **Run Renode Simulation**: The project contains `.resc` scripts to simulate STM32 targets completely in software using [Renode](https://renode.io/) which I used to test every family of microcontrolers.
 
+## LeafTS Studio 
+
+The video below is a showscase how to use **LeafTS Studio**: 
+ - How to connect via UART
+ - Generating a ready-to-compile C project files
+ - Running live data base in terminal
+
 https://github.com/user-attachments/assets/f9623eb2-3aa0-4962-9621-a4b7c494a65f
 
 
