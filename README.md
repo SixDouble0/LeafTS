@@ -96,6 +96,9 @@ The video below is a showscase how to use **LeafTS Studio**:
 
 https://github.com/user-attachments/assets/f9623eb2-3aa0-4962-9621-a4b7c494a65f
 
+## LeafTS Docs
+
+https://www.sixdouble0.tech/leafts
 
 ## License
 This project is licensed under the MIT License.
